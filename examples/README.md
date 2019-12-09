@@ -32,16 +32,13 @@ We've made it easy to run the browser based examples on your local machine.
 1. Build and run the example server:
     ``` sh
     GO111MODULE=on go get github.com/pion/webrtc/v2
-    git clone https://github.com/pion/webrtc.git $GOPATH/src/github.com/pion/webrtc
     cd $GOPATH/src/github.com/pion/webrtc/examples
     go run examples.go
     ```
 
-2. Browse to [localhost](http://localhost) to browse through the examples. Note that you can change the port of the server using the ``--address`` flag:
-    ``` sh
-    go run examples.go --address localhost:8080
-    go run examples.go --address :8080            # listen on all available interfaces
-    ```
+2. Browse to [localhost](http://localhost) to browse through the examples.
+
+Note that you can change the port of the server using the ``--address`` flag.
 
 ### WebAssembly
 Some of our examples have support for WebAssembly. The same examples server documented above can be used to run the WebAssembly examples. However, you have to compile them first. This is done as follows:

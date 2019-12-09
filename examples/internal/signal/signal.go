@@ -75,6 +75,19 @@ func Decode(in string, obj interface{}) {
 	}
 }
 
+func DecodeNoBase64(in string, obj interface{}) {
+	b :=  []byte(in)
+
+	if compress {
+		b = unzip(b)
+	}
+
+	err := json.Unmarshal(b, obj)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func zip(in []byte) []byte {
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)

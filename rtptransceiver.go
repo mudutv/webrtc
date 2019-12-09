@@ -16,6 +16,7 @@ type RTPTransceiver struct {
 	// receptive bool
 	stopped bool
 	kind    RTPCodecType
+	ExtMap  []string
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {

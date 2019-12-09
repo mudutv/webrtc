@@ -8,7 +8,6 @@ import (
 	"io"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -24,7 +23,6 @@ var errSCTPNotEstablished = errors.New("SCTP not established")
 type DataChannel struct {
 	mu sync.RWMutex
 
-	statsID                    string
 	label                      string
 	ordered                    bool
 	maxPacketLifeTime          *uint16
@@ -85,11 +83,10 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 	}
 
 	return &DataChannel{
-		statsID:           fmt.Sprintf("DataChannel-%d", time.Now().UnixNano()),
 		label:             params.Label,
 		protocol:          params.Protocol,
 		negotiated:        params.Negotiated,
-		id:                params.ID,
+		id:                &params.ID,
 		ordered:           params.Ordered,
 		maxPacketLifeTime: params.MaxPacketLifeTime,
 		maxRetransmits:    params.MaxRetransmits,
@@ -149,15 +146,6 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		Protocol:             d.protocol,
 		Negotiated:           d.negotiated,
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
-	}
-
-	if d.id == nil {
-		generatedID, err := d.sctpTransport.generateDataChannelID(d.sctpTransport.dtlsTransport.role())
-		if err != nil {
-			return err
-		}
-
-		d.id = &generatedID
 	}
 
 	dc, err := datachannel.Dial(d.sctpTransport.association, *d.id, cfg)
@@ -269,8 +257,8 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 }
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
-	d.setReadyState(DataChannelStateOpen)
 	d.mu.Lock()
+	d.readyState = DataChannelStateOpen
 	d.dataChannel = dc
 	d.mu.Unlock()
 
@@ -307,7 +295,9 @@ func (d *DataChannel) readLoop() {
 		buffer := make([]byte, dataChannelBufferSize)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
-			d.setReadyState(DataChannelStateClosed)
+			d.mu.Lock()
+			d.readyState = DataChannelStateClosed
+			d.mu.Unlock()
 			if err != io.EOF {
 				d.onError(err)
 			}
@@ -386,18 +376,14 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 // the DataChannel object was created by this peer or the remote peer.
 func (d *DataChannel) Close() error {
 	d.mu.Lock()
-	isClosed := d.readyState == DataChannelStateClosed
-	haveSctpTransport := d.dataChannel != nil
-	d.mu.Unlock()
+	defer d.mu.Unlock()
 
-	if isClosed {
+	if d.readyState == DataChannelStateClosing ||
+		d.readyState == DataChannelStateClosed {
 		return nil
 	}
 
-	d.setReadyState(DataChannelStateClosing)
-	if !haveSctpTransport {
-		return nil
-	}
+	d.readyState = DataChannelStateClosing
 
 	return d.dataChannel.Close()
 }
@@ -543,27 +529,25 @@ func (d *DataChannel) OnBufferedAmountLow(f func()) {
 func (d *DataChannel) getStatsID() string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.statsID
+	return fmt.Sprintf("DataChannel-%d", *d.id)
 }
 
 func (d *DataChannel) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
+	statsID := d.getStatsID()
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	stats := DataChannelStats{
-		Timestamp: statsTimestampNow(),
-		Type:      StatsTypeDataChannel,
-		ID:        d.statsID,
-		Label:     d.label,
-		Protocol:  d.protocol,
+		Timestamp:             statsTimestampNow(),
+		Type:                  StatsTypeDataChannel,
+		ID:                    statsID,
+		Label:                 d.label,
+		Protocol:              d.protocol,
+		DataChannelIdentifier: int32(*d.id),
 		// TransportID string `json:"transportId"`
 		State: d.readyState,
-	}
-
-	if d.id != nil {
-		stats.DataChannelIdentifier = int32(*d.id)
 	}
 
 	if d.dataChannel != nil {
@@ -574,11 +558,4 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 	}
 
 	collector.Collect(stats.ID, stats)
-}
-
-func (d *DataChannel) setReadyState(r DataChannelState) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.readyState = r
 }

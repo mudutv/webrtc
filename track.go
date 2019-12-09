@@ -9,6 +9,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v2/pkg/media"
+	"context"
 )
 
 const (
@@ -90,6 +91,19 @@ func (t *Track) Read(b []byte) (n int, err error) {
 	return r.readRTP(b)
 }
 
+// Read reads data from the track. If this is a local track this will error
+func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+	t.mu.RLock()
+	if len(t.activeSenders) != 0 {
+		t.mu.RUnlock()
+		return 0, fmt.Errorf("this is a local track and must not be read from")
+	}
+	r := t.receiver
+	t.mu.RUnlock()
+
+	return r.readRTPContext(b,ctx)
+}
+
 // ReadRTP is a convenience method that wraps Read and unmarshals for you
 func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	b := make([]byte, receiveMTU)
@@ -104,6 +118,23 @@ func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	}
 	return r, nil
 }
+
+// ReadRTP is a convenience method that wraps Read and unmarshals for you
+func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := t.ReadContext(b,ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &rtp.Packet{}
+	if err := r.Unmarshal(b[:i]); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+
 
 // Write writes data to the track. If this is a remote track this will error
 func (t *Track) Write(b []byte) (n int, err error) {

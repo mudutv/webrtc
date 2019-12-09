@@ -138,6 +138,9 @@ const (
 	VP8  = "VP8"
 	VP9  = "VP9"
 	H264 = "H264"
+	RED = "red"
+	ULPFEC = "ulpfec"
+	RTX = "rtx"
 )
 
 // NewRTPPCMUCodec is a helper to create a PCMU codec
@@ -218,9 +221,44 @@ func NewRTPH264Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 		H264,
 		clockrate,
 		0,
-		"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+		//"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+		"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
 		payloadType,
 		&codecs.H264Payloader{})
+	return c
+}
+
+// NewRTPH264Codec is a helper to create an H264 codec
+func NewRTPRedCodec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeVideo,
+		RED,
+		clockrate,
+		0,
+		"",
+		payloadType,
+		&codecs.VP8Payloader{})
+	return c
+}
+
+func NewRTPUlpFecCodec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeVideo,
+		ULPFEC,
+		clockrate,
+		0,
+		"",
+		payloadType,
+		&codecs.VP8Payloader{})
+	return c
+}
+
+func NewRTPRtxCodec(payloadType uint8, clockrate uint32, fmtp string) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeVideo,
+		RTX,
+		clockrate,
+		0,
+		fmtp,
+		payloadType,
+		&codecs.VP8Payloader{})
 	return c
 }
 
@@ -265,6 +303,7 @@ type RTPCodec struct {
 	Type        RTPCodecType
 	Name        string
 	PayloadType uint8
+	//RtxPayloadType uint8
 	Payloader   rtp.Payloader
 }
 

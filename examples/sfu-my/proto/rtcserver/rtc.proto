@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package rtcserver;
+
+service RtcInterface {
+    rpc SetConfig(ConfigInfo) returns(ReplyInfo) {}
+    rpc CreateOffer(SdpData) returns(ReplyInfo) {}
+    rpc SetCandidate(CandidateData) returns(ReplyInfo) {}
+    rpc StartPlay(PeerInfo) returns(ReplyInfo) {}
+    rpc CreateAnswer(SdpData) returns(ReplyInfo) {}
+    rpc ClosePeer(PeerInfo) returns(ReplyInfo) {}
+    rpc IsExistStream(PeerInfo) returns(ReplyInfo) {}
+}
+
+message PeerInfo {
+    string peer_id = 1;
+    string stream_key = 2;
+    bool video = 3;
+    bool audio = 4;
+}
+
+message ConfigInfo {
+    string peer_id = 1;
+    uint32 bitrate = 2;
+    string videocodec = 3;
+    bool has_audio = 4;
+    bool has_video = 5;
+}
+
+message SdpData {
+    string peer_id = 1;
+    string stream_key = 2;
+    string sdp = 3;
+}
+
+message CandidateData {
+    string peer_id = 1;
+    string candidate = 2;
+    string sdp_mid = 3;
+    int32 sdp_mline_index = 4;
+}
+
+message ReplyInfo{
+    bool   result = 1; //success or failed
+    string errmsg = 2;
+}

@@ -281,7 +281,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.Equal(t, uint32(1), connStatsAnswer.DataChannelsClosed)
 	assert.Equal(t, uint32(0), connStatsAnswer.DataChannelsRequested)
 	assert.Equal(t, uint32(1), connStatsAnswer.DataChannelsAccepted)
-	dcStatsAnswer = getDataChannelStats(t, reportPCAnswer, answerDC)
+	dcStatsAnswer = getDataChannelStats(t, reportPCOffer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
 
 	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")

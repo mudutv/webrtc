@@ -9,6 +9,8 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/srtp"
+	"context"
+	"errors"
 )
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
@@ -121,6 +123,19 @@ func (r *RTPSender) Read(b []byte) (n int, err error) {
 	return r.rtcpReadStream.Read(b)
 }
 
+// Read reads incoming RTCP for this RTPReceiver
+func (r *RTPSender) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+	select {
+	case <-r.sendCalled:
+	case <-ctx.Done():
+		return 0, errors.New("poin read context done")
+
+	}
+
+	return r.rtcpReadStream.ReadContext(b,ctx)
+}
+
+
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
 func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
@@ -131,6 +146,19 @@ func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 
 	return rtcp.Unmarshal(b[:i])
 }
+
+// ReadRTCP is a convenience method that wraps Read and unmarshals for you
+func (r *RTPSender) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.ReadContext(b,ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return rtcp.Unmarshal(b[:i])
+}
+
+
 
 // sendRTP should only be called by a track, this only exists so we can keep state in one place
 func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {

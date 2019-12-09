@@ -50,6 +50,12 @@ type PeerConnection struct {
 
 	rtpTransceivers []*RTPTransceiver
 
+	// DataChannels
+	dataChannels          map[uint16]*DataChannel
+	dataChannelsOpened    uint32
+	dataChannelsRequested uint32
+	dataChannelsAccepted  uint32
+
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler func(ICEConnectionState)
 	onConnectionStateChangeHandler    func(PeerConnectionState)
@@ -97,6 +103,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		signalingState:     SignalingStateStable,
 		iceConnectionState: ICEConnectionStateNew,
 		connectionState:    PeerConnectionStateNew,
+		dataChannels:       make(map[uint16]*DataChannel),
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
@@ -112,7 +119,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 
-	if !pc.api.settingEngine.candidates.ICETrickle {
+	if !pc.iceGatherer.agentIsTrickle {
 		if err = pc.iceGatherer.Gather(); err != nil {
 			return nil, err
 		}
@@ -128,19 +135,6 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 	pc.dtlsTransport = dtlsTransport
-
-	// Create the SCTP transport
-	pc.sctpTransport = pc.api.NewSCTPTransport(pc.dtlsTransport)
-
-	// Wire up the on datachannel handler
-	pc.sctpTransport.OnDataChannel(func(d *DataChannel) {
-		pc.mu.RLock()
-		hdlr := pc.onDataChannelHandler
-		pc.mu.RUnlock()
-		if hdlr != nil {
-			hdlr(d)
-		}
-	})
 
 	return pc, nil
 }
@@ -449,7 +443,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 	}
 
-	if pc.api.settingEngine.candidates.ICELite {
+	if pc.iceGatherer.lite {
 		// RFC 5245 S15.3
 		d = d.WithValueAttribute(sdp.AttrKeyICELite, sdp.AttrKeyICELite)
 	}
@@ -869,7 +863,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	// setup while also support the old trickle=false synchronous gathering
 	// process this is necessary to avoid calling Gather() in multiple
 	// places; which causes race conditions. (issue-707)
-	if !pc.api.settingEngine.candidates.ICETrickle {
+	if !pc.iceGatherer.agentIsTrickle {
 		if err := pc.iceGatherer.SignalCandidates(); err != nil {
 			return err
 		}
@@ -959,11 +953,34 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	fingerprint = parts[1]
 	fingerprintHash := parts[0]
 
+	// Create the SCTP transport
+	sctp := pc.api.NewSCTPTransport(pc.dtlsTransport)
+	pc.sctpTransport = sctp
+
+	// Wire up the on datachannel handler
+	sctp.OnDataChannel(func(d *DataChannel) {
+		pc.mu.RLock()
+		hdlr := pc.onDataChannelHandler
+		pc.dataChannels[*d.ID()] = d
+		pc.dataChannelsAccepted++
+		pc.mu.RUnlock()
+		if hdlr != nil {
+			hdlr(d)
+		}
+	})
+
+	// Wire up the on datachannel opened handler
+	sctp.OnDataChannelOpened(func(d *DataChannel) {
+		pc.mu.RLock()
+		pc.dataChannelsOpened++
+		pc.mu.RUnlock()
+	})
+
 	iceRole := ICERoleControlled
 	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
 	// If both or neither agents are lite the offering agent is controlling.
 	// RFC 8445 S6.1.1
-	if (weOffer && remoteIsLite == pc.api.settingEngine.candidates.ICELite) || (remoteIsLite && !pc.api.settingEngine.candidates.ICELite) {
+	if (weOffer && remoteIsLite == pc.iceGatherer.lite) || (remoteIsLite && !pc.iceGatherer.lite) {
 		iceRole = ICERoleControlling
 	}
 
@@ -1272,6 +1289,19 @@ func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
 	return pc.rtpTransceivers
 }
 
+func (pc *PeerConnection) GetTransceiverByKind(trackOrKind RTPCodecType) *RTPTransceiver {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	for _,tr := range pc.rtpTransceivers{
+		if tr.kind == trackOrKind{
+			return tr
+		}
+	}
+	return nil
+}
+
+
 // AddTrack adds a Track to the PeerConnection
 func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	if pc.isClosed.get() {
@@ -1424,19 +1454,28 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
 func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelInit) (*DataChannel, error) {
+	pc.mu.Lock()
+
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
+	// pion/webrtc#748
 	params := &DataChannelParameters{
 		Label:   label,
 		Ordered: true,
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
-	if options != nil {
-		params.ID = options.ID
+	if options == nil || options.ID == nil {
+		var err error
+		if params.ID, err = pc.generateDataChannelID(true); err != nil {
+			pc.mu.Unlock()
+			return nil, err
+		}
+	} else {
+		params.ID = *options.ID
 	}
 
 	if options != nil {
@@ -1464,6 +1503,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #11)
 		if len(params.Protocol) > 65535 {
+			pc.mu.Unlock()
 			return nil, &rtcerr.TypeError{Err: ErrProtocolTooLarge}
 		}
 
@@ -1473,29 +1513,56 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		}
 	}
 
+	// pion/webrtc#748
 	d, err := pc.api.newDataChannel(params, pc.log)
 	if err != nil {
+		pc.mu.Unlock()
 		return nil, err
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
 	if d.maxPacketLifeTime != nil && d.maxRetransmits != nil {
+		pc.mu.Unlock()
 		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
 	}
 
-	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannels = append(pc.sctpTransport.dataChannels, d)
-	pc.sctpTransport.dataChannelsRequested++
-	pc.sctpTransport.lock.Unlock()
+	// Remember datachannel
+	pc.dataChannels[params.ID] = d
 
-	// If SCTP already connected open all the channels
-	if pc.sctpTransport.State() == SCTPTransportStateConnected {
-		if err = d.open(pc.sctpTransport); err != nil {
+	sctpReady := pc.sctpTransport != nil && pc.sctpTransport.association != nil
+
+	pc.dataChannelsRequested++
+	pc.mu.Unlock()
+
+	// Open if networking already started
+	if sctpReady {
+		err = d.open(pc.sctpTransport)
+		if err != nil {
 			return nil, err
 		}
 	}
 
 	return d, nil
+}
+
+func (pc *PeerConnection) generateDataChannelID(client bool) (uint16, error) {
+	var id uint16
+	if !client {
+		id++
+	}
+
+	max := sctpMaxChannels
+	if pc.sctpTransport != nil {
+		max = pc.sctpTransport.MaxChannels()
+	}
+
+	for ; id < max-1; id += 2 {
+		_, ok := pc.dataChannels[id]
+		if !ok {
+			return id, nil
+		}
+	}
+	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
@@ -1527,6 +1594,30 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 	return nil
 }
 
+// WriteRTCP sends a user provided RTCP packet to the connected peer
+// If no peer is connected the packet is discarded
+func (pc *PeerConnection) WriteRTCPLen(pkts []rtcp.Packet) (int, error) {
+	raw, err := rtcp.Marshal(pkts)
+	if err != nil {
+		return 0,err
+	}
+
+	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+	if err != nil {
+		return 0,nil // TODO WriteRTCP before would gracefully discard packets until ready
+	}
+
+	writeStream, err := srtcpSession.OpenWriteStream()
+	if err != nil {
+		return 0,fmt.Errorf("WriteRTCP failed to open WriteStream: %v", err)
+	}
+
+	if n, err := writeStream.Write(raw); err != nil {
+		return n, err
+	}
+	return 0, nil
+}
+
 // Close ends the PeerConnection
 func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
@@ -1546,37 +1637,9 @@ func (pc *PeerConnection) Close() error {
 	// 2. A Mux stops this chain. It won't close the underlying
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
+
 	var closeErrs []error
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
-	for _, t := range pc.rtpTransceivers {
-		if err := t.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
-	}
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
-	if pc.sctpTransport != nil {
-		pc.sctpTransport.lock.Lock()
-		for _, d := range pc.sctpTransport.dataChannels {
-			d.setReadyState(DataChannelStateClosed)
-		}
-		pc.sctpTransport.lock.Unlock()
-	}
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
-	if pc.sctpTransport != nil {
-		if err := pc.sctpTransport.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
-	}
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8)
-	if err := pc.dtlsTransport.Stop(); err != nil {
-		closeErrs = append(closeErrs, err)
-	}
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #9,#10,#11)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	if pc.iceTransport != nil {
 		if err := pc.iceTransport.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
@@ -1586,6 +1649,21 @@ func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 
+	if err := pc.dtlsTransport.Stop(); err != nil {
+		closeErrs = append(closeErrs, err)
+	}
+
+	if pc.sctpTransport != nil {
+		if err := pc.sctpTransport.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	for _, t := range pc.rtpTransceivers {
+		if err := t.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
 	return util.FlattenErrs(closeErrs)
 }
 
@@ -1646,6 +1724,9 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 		}
 	}
 
+	for _, ext := range t.ExtMap {
+		media = media.WithExtmap(ext)
+	}
 	media = media.WithPropertyAttribute(t.Direction.String())
 
 	addCandidatesToMediaDescriptions(candidates, media)
@@ -1797,39 +1878,28 @@ func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 
 // GetStats return data providing statistics about the overall connection
 func (pc *PeerConnection) GetStats() StatsReport {
-	var (
-		dataChannelsAccepted  uint32
-		dataChannelsClosed    uint32
-		dataChannelsOpened    uint32
-		dataChannelsRequested uint32
-	)
 	statsCollector := newStatsReportCollector()
 	statsCollector.Collecting()
 
 	pc.mu.Lock()
+	var dataChannelsClosed uint32
+	for _, d := range pc.dataChannels {
+		state := d.ReadyState()
+
+		if state != DataChannelStateConnecting && state != DataChannelStateOpen {
+			dataChannelsClosed++
+		}
+
+		d.collectStats(statsCollector)
+	}
+
 	if pc.iceGatherer != nil {
 		pc.iceGatherer.collectStats(statsCollector)
 	}
 	if pc.iceTransport != nil {
 		pc.iceTransport.collectStats(statsCollector)
 	}
-
 	if pc.sctpTransport != nil {
-		pc.sctpTransport.lock.Lock()
-		dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
-		dataChannelsAccepted = pc.sctpTransport.dataChannelsAccepted
-		dataChannelsOpened = pc.sctpTransport.dataChannelsOpened
-		dataChannelsRequested = pc.sctpTransport.dataChannelsRequested
-		pc.sctpTransport.lock.Unlock()
-
-		for _, d := range dataChannels {
-			state := d.ReadyState()
-			if state != DataChannelStateConnecting && state != DataChannelStateOpen {
-				dataChannelsClosed++
-			}
-
-			d.collectStats(statsCollector)
-		}
 		pc.sctpTransport.collectStats(statsCollector)
 	}
 
@@ -1837,10 +1907,10 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		Timestamp:             statsTimestampNow(),
 		Type:                  StatsTypePeerConnection,
 		ID:                    pc.statsID,
-		DataChannelsAccepted:  dataChannelsAccepted,
+		DataChannelsOpened:    pc.dataChannelsOpened,
 		DataChannelsClosed:    dataChannelsClosed,
-		DataChannelsOpened:    dataChannelsOpened,
-		DataChannelsRequested: dataChannelsRequested,
+		DataChannelsRequested: pc.dataChannelsRequested,
+		DataChannelsAccepted:  pc.dataChannelsAccepted,
 	}
 	pc.mu.Unlock()
 
@@ -1907,27 +1977,28 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		return
 	}
 
-	// DataChannels that need to be opened now that SCTP is available
-	// make a copy we may have incoming DataChannels mutating this while we open
-	pc.sctpTransport.lock.RLock()
-	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
-	pc.sctpTransport.lock.RUnlock()
+	// Open data channels that where created before signaling
+	pc.mu.Lock()
+	// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
+	dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
+	for k, v := range pc.dataChannels {
+		dataChannels[k] = v
+	}
+	pc.mu.Unlock()
 
 	var openedDCCount uint32
 	for _, d := range dataChannels {
-		if d.readyState == DataChannelStateConnecting {
-			err := d.open(pc.sctpTransport)
-			if err != nil {
-				pc.log.Warnf("failed to open data channel: %s", err)
-				continue
-			}
-			openedDCCount++
+		err := d.open(pc.sctpTransport)
+		if err != nil {
+			pc.log.Warnf("failed to open data channel: %s", err)
+			continue
 		}
+		openedDCCount++
 	}
 
-	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannelsOpened += openedDCCount
-	pc.sctpTransport.lock.Unlock()
+	pc.mu.Lock()
+	pc.dataChannelsOpened += openedDCCount
+	pc.mu.Unlock()
 
 }
 
@@ -1943,4 +2014,33 @@ func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDes
 	if len(candidates) != 0 {
 		m.WithPropertyAttribute("end-of-candidates")
 	}
+}
+
+//==========================================================
+func getMidValueMy(media *sdp.MediaDescription) string {
+	for _, attr := range media.Attributes {
+		if attr.Key == "mid" {
+			return attr.Value
+		}
+	}
+	return ""
+}
+
+func DescriptionIsPlanB(desc *SessionDescription) bool {
+	if desc == nil  {
+		return false
+	}
+
+	desc.parsed = &sdp.SessionDescription{}
+	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
+		return false
+	}
+
+	detectionRegex := regexp.MustCompile(`(?i)^(audio|video|data)$`)
+	for _, media := range desc.parsed.MediaDescriptions {
+		if len(detectionRegex.FindStringSubmatch(getMidValueMy(media))) == 2 {
+			return true
+		}
+	}
+	return false
 }

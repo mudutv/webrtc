@@ -7,6 +7,5 @@ const (
 	unknownStr = "unknown"
 	ssrcStr    = "ssrc"
 
-	// Equal to UDP MTU
-	receiveMTU = 1460
+	receiveMTU = 8192
 )

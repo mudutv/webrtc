@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 
+	"context"
+	"errors"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp"
 )
@@ -103,6 +105,19 @@ func (r *RTPReceiver) Read(b []byte) (n int, err error) {
 	return r.rtcpReadStream.Read(b)
 }
 
+// Read reads incoming RTCP for this RTPReceiver
+func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
+	select {
+	case <-r.received:
+	case <-ctx.Done():
+		return 0, errors.New("poin read context done")
+	}
+
+	return r.rtcpReadStream.ReadContext(b,ctx)
+}
+
+
+
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
@@ -113,6 +128,18 @@ func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 
 	return rtcp.Unmarshal(b[:i])
 }
+
+// ReadRTCP is a convenience method that wraps Read and unmarshals for you
+func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.ReadContext(b,ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return rtcp.Unmarshal(b[:i])
+}
+
 
 // Stop irreversibly stops the RTPReceiver
 func (r *RTPReceiver) Stop() error {
@@ -145,3 +172,17 @@ func (r *RTPReceiver) readRTP(b []byte) (n int, err error) {
 	<-r.received
 	return r.rtpReadStream.Read(b)
 }
+
+// readRTP should only be called by a track, this only exists so we can keep state in one place
+func (r *RTPReceiver) readRTPContext(b []byte, ctx context.Context) (n int, err error) {
+	select {
+	case <-r.received:
+	case <-ctx.Done():
+		return 0, errors.New("poin read context done")
+
+	}
+
+	return r.rtpReadStream.ReadContext(b,ctx)
+}
+
+

@@ -81,10 +81,6 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 
 	agent := t.gatherer.agent
-	if agent == nil {
-		return errors.New("ICEAgent does not exist, unable to start ICETransport")
-	}
-
 	if err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
 		state := newICETransportStateFromICE(iceState)
 		t.lock.Lock()
@@ -267,7 +263,7 @@ func (t *ICETransport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
 func (t *ICETransport) ensureGatherer() error {
 	if t.gatherer == nil {
 		return errors.New("gatherer not started")
-	} else if t.gatherer.getAgent() == nil && t.gatherer.api.settingEngine.candidates.ICETrickle {
+	} else if t.gatherer.getAgent() == nil && t.gatherer.agentIsTrickle {
 		// Special case for trickle=true. (issue-707)
 		if err := t.gatherer.createAgent(); err != nil {
 			return err
