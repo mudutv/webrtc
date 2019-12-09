@@ -5,9 +5,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/pion/webrtc/v2"
+	"github.com/mudutv/webrtc/v2"
 
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v2/examples/internal/signal"
 )
 
 const messageSize = 15

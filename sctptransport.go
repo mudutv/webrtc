@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/datachannel"
-	"github.com/pion/logging"
-	"github.com/pion/sctp"
+	"github.com/mudutv/datachannel"
+	"github.com/mudutv/logging"
+	"github.com/mudutv/sctp"
 )
 
 const sctpMaxChannels = uint16(65535)

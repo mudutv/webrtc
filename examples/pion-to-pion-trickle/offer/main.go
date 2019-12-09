@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/webrtc/v2"
+	"github.com/mudutv/webrtc/v2"
 
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v2/examples/internal/signal"
 )
 
 func signalCandidate(addr string, c *webrtc.ICECandidate) error {

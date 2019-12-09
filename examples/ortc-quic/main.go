@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pion/quic"
-	"github.com/pion/webrtc/v2"
+	"github.com/mudutv/quic"
+	"github.com/mudutv/webrtc/v2"
 
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v2/examples/internal/signal"
 )
 
 const messageSize = 15

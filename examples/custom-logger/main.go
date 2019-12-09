@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/pion/logging"
-	"github.com/pion/webrtc/v2"
+	"github.com/mudutv/logging"
+	"github.com/mudutv/webrtc/v2"
 )
 
 // Everything below is the Pion WebRTC API! Thanks for using it ❤️.

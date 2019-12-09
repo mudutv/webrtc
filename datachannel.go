@@ -9,9 +9,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/pion/datachannel"
-	"github.com/pion/logging"
-	"github.com/pion/webrtc/v2/pkg/rtcerr"
+	"github.com/mudutv/datachannel"
+	"github.com/mudutv/logging"
+	"github.com/mudutv/webrtc/v2/pkg/rtcerr"
 )
 
 const dataChannelBufferSize = math.MaxUint16 //message size limit for Chromium
