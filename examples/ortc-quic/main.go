@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mudutv/quic"
+	"github.com/pion/quic"
 	"github.com/mudutv/webrtc/v2"
 
 	"github.com/mudutv/webrtc/v2/examples/internal/signal"

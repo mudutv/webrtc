@@ -15,7 +15,7 @@ import (
 
 	"github.com/mudutv/dtls"
 	"github.com/mudutv/logging"
-	"github.com/mudutv/quic"
+	"github.com/pion/quic"
 	"github.com/mudutv/webrtc/v2/internal/mux"
 	"github.com/mudutv/webrtc/v2/pkg/rtcerr"
 )

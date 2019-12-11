@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mudutv/quic"
+	"github.com/pion/quic"
 	"github.com/mudutv/transport/test"
 	"github.com/mudutv/webrtc/v2/internal/util"
 )
