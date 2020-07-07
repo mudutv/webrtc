@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/mudutv/rtp"
-	"github.com/mudutv/webrtc/v2/pkg/media"
+	"github.com/mudutv/webrtc/v3/pkg/media"
 	"context"
 )
 
@@ -78,30 +78,25 @@ func (t *Track) Codec() *RTPCodec {
 	return t.codec
 }
 
-// Read reads data from the track. If this is a local track this will error
-func (t *Track) Read(b []byte) (n int, err error) {
+// Packetizer gets the Packetizer of the track
+func (t *Track) Packetizer() rtp.Packetizer {
 	t.mu.RLock()
-	if len(t.activeSenders) != 0 {
-		t.mu.RUnlock()
-		return 0, fmt.Errorf("this is a local track and must not be read from")
-	}
-	r := t.receiver
-	t.mu.RUnlock()
-
-	return r.readRTP(b)
+	defer t.mu.RUnlock()
+	return t.packetizer
 }
 
 // Read reads data from the track. If this is a local track this will error
-func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+func (t *Track) Read(b []byte) (n int, err error) {
 	t.mu.RLock()
-	if len(t.activeSenders) != 0 {
+	r := t.receiver
+
+	if t.totalSenderCount != 0 || r == nil {
 		t.mu.RUnlock()
 		return 0, fmt.Errorf("this is a local track and must not be read from")
 	}
-	r := t.receiver
 	t.mu.RUnlock()
 
-	return r.readRTPContext(b,ctx)
+	return r.readRTP(b)
 }
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you
@@ -118,23 +113,6 @@ func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	}
 	return r, nil
 }
-
-// ReadRTP is a convenience method that wraps Read and unmarshals for you
-func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := t.ReadContext(b,ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	r := &rtp.Packet{}
-	if err := r.Unmarshal(b[:i]); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-
 
 // Write writes data to the track. If this is a remote track this will error
 func (t *Track) Write(b []byte) (n int, err error) {
@@ -181,7 +159,7 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 	}
 
 	for _, s := range senders {
-		_, err := s.sendRTP(&p.Header, p.Payload)
+		_, err := s.SendRTP(&p.Header, p.Payload)
 		if err != nil {
 			return err
 		}
@@ -229,4 +207,34 @@ func (t *Track) determinePayloadType() error {
 	defer t.mu.Unlock()
 
 	return nil
+}
+
+
+// miaobinwei
+func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+	t.mu.RLock()
+	if len(t.activeSenders) != 0 {
+		t.mu.RUnlock()
+		return 0, fmt.Errorf("this is a local track and must not be read from")
+	}
+	r := t.receiver
+	t.mu.RUnlock()
+
+	return r.readRTPContext(b,ctx)
+}
+
+
+// miaobinwei
+func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := t.ReadContext(b,ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &rtp.Packet{}
+	if err := r.Unmarshal(b[:i]); err != nil {
+		return nil, err
+	}
+	return r, nil
 }

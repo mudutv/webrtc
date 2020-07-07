@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"fmt"
+	"io"
 	"sync"
 
 	"context"
@@ -68,7 +69,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		return fmt.Errorf("Receive has already been called")
 	default:
 	}
-	close(r.received)
+	defer close(r.received)
 
 	r.track = &Track{
 		kind:     r.kind,
@@ -101,22 +102,13 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 
 // Read reads incoming RTCP for this RTPReceiver
 func (r *RTPReceiver) Read(b []byte) (n int, err error) {
-	<-r.received
-	return r.rtcpReadStream.Read(b)
-}
-
-// Read reads incoming RTCP for this RTPReceiver
-func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
 	select {
 	case <-r.received:
-	case <-ctx.Done():
-		return 0, errors.New("poin read context done")
+		return r.rtcpReadStream.Read(b)
+	case <-r.closed:
+		return 0, io.ErrClosedPipe
 	}
-
-	return r.rtcpReadStream.ReadContext(b,ctx)
 }
-
-
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
@@ -129,17 +121,14 @@ func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 	return rtcp.Unmarshal(b[:i])
 }
 
-// ReadRTCP is a convenience method that wraps Read and unmarshals for you
-func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := r.ReadContext(b,ctx)
-	if err != nil {
-		return nil, err
+func (r *RTPReceiver) haveReceived() bool {
+	select {
+	case <-r.received:
+		return true
+	default:
+		return false
 	}
-
-	return rtcp.Unmarshal(b[:i])
 }
-
 
 // Stop irreversibly stops the RTPReceiver
 func (r *RTPReceiver) Stop() error {
@@ -154,11 +143,15 @@ func (r *RTPReceiver) Stop() error {
 
 	select {
 	case <-r.received:
-		if err := r.rtcpReadStream.Close(); err != nil {
-			return err
+		if r.rtcpReadStream != nil {
+			if err := r.rtcpReadStream.Close(); err != nil {
+				return err
+			}
 		}
-		if err := r.rtpReadStream.Close(); err != nil {
-			return err
+		if r.rtpReadStream != nil {
+			if err := r.rtpReadStream.Close(); err != nil {
+				return err
+			}
 		}
 	default:
 	}
@@ -173,7 +166,30 @@ func (r *RTPReceiver) readRTP(b []byte) (n int, err error) {
 	return r.rtpReadStream.Read(b)
 }
 
-// readRTP should only be called by a track, this only exists so we can keep state in one place
+
+// miaobinwei
+func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
+	select {
+	case <-r.received:
+	case <-ctx.Done():
+		return 0, errors.New("poin read context done")
+	}
+
+	return r.rtcpReadStream.ReadContext(b,ctx)
+}
+
+// ReadRTCP is a convenience method that wraps Read and unmarshals for you miaobinwei
+func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.ReadContext(b,ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return rtcp.Unmarshal(b[:i])
+}
+
+// readRTP should only be called by a track, this only exists so we can keep state in one place miaobinwei
 func (r *RTPReceiver) readRTPContext(b []byte, ctx context.Context) (n int, err error) {
 	select {
 	case <-r.received:

@@ -1,11 +1,12 @@
-# data-channels
+# data-channels-detach-create
 data-channels-detach-create is an example that shows how you can detach a data channel. This allows direct access the the underlying [pion/datachannel](https://github.com/mudutv/datachannel). This allows you to interact with the data channel using a more idiomatic API based on the `io.ReadWriteCloser` interface.
 
 The example mirrors the data-channels-create example.
 
 ## Install
 ```
-go get github.com/mudutv/webrtc/examples/data-channels-detach-create
+export GO111MODULE=on
+go get github.com/mudutv/webrtc/v3/examples/data-channels-detach-create
 ```
 
 ## Usage

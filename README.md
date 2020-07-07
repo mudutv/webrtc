@@ -9,37 +9,45 @@
   <a href="https://pion.ly"><img src="https://img.shields.io/badge/pion-webrtc-gray.svg?longCache=true&colorB=brightgreen" alt="Pion webrtc"></a>
   <a href="https://sourcegraph.com/github.com/mudutv/webrtc?badge"><img src="https://sourcegraph.com/github.com/mudutv/webrtc/-/badge.svg" alt="Sourcegraph Widget"></a>
   <a href="https://pion.ly/slack"><img src="https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen" alt="Slack Widget"></a>
+  <a href="https://twitter.com/_pion?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40_pion&style=social&url=https%3A%2F%2Ftwitter.com%2F_pion" alt="Twitter Widget"></a>
+  <a href="https://github.com/mudutv/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
-  <a href="https://travis-ci.org/pion/webrtc"><img src="https://travis-ci.org/pion/webrtc.svg?branch=master" alt="Build Status"></a>
-  <a href="https://godoc.org/github.com/mudutv/webrtc"><img src="https://godoc.org/github.com/mudutv/webrtc?status.svg" alt="GoDoc"></a>
-  <a href="https://codecov.io/gh/pion/webrtc"><img src="https://codecov.io/gh/pion/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
+  <a href="https://travis-ci.org/mudutv/webrtc"><img src="https://travis-ci.org/mudutv/webrtc.svg?branch=master" alt="Build Status"></a>
+  <a href="https://pkg.go.dev/github.com/mudutv/webrtc/v3"><img src="https://godoc.org/github.com/mudutv/webrtc?status.svg" alt="GoDoc"></a>
+  <a href="https://codecov.io/gh/mudutv/webrtc"><img src="https://codecov.io/gh/mudutv/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
   <a href="https://goreportcard.com/report/github.com/mudutv/webrtc"><img src="https://goreportcard.com/badge/github.com/mudutv/webrtc" alt="Go Report Card"></a>
   <a href="https://www.codacy.com/app/Sean-Der/webrtc"><img src="https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d" alt="Codacy Badge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 <br>
 
-
-See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
-
 ### Breaking Changes
 
-Pion WebRTC v2.0.0 has arrived! See the [release notes](https://pion.ly/knowledge-base/release-notes/webrtc-v2.0.0/) to learn about new features and breaking changes.
+Pion WebRTC v3.0.0 has started! See the [release notes](https://github.com/mudutv/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
 
-Have any questions? Join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
+Until `v3.0.0` has been tagged using `v2` is suggested. The last `v2` release is [v2.2.17](https://github.com/mudutv/webrtc/releases/tag/v2.2.17)
 
-We are actively planning [v2.1.0](https://github.com/mudutv/webrtc/projects/11) and would love your feedback! Anyone can add issues, and anything that you think can empower Pion users.
+[Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
+
+We are actively planning and would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
+
+----
+
+Pion WebRTC is a pure Go implementation of WebRTC. It has zero non-Go dependencies and no 3rd party Go dependencies. It is designed to follow **[WebRTC API](https://w3c.github.io/webrtc-pc/)**, but may deviate when required.
+See [DESIGN.md](DESIGN.md) for the guiding principals/inspirations of the project.
 
 ### Usage
-Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
+**[example applications](examples/README.md)** contains code samples of common things people build with Pion WebRTC.
 
-For more full featured examples that use 3rd party libraries see our **[example-webrtc-applications](https://github.com/mudutv/example-webrtc-applications)** repo.
+**[example-webrtc-applications](https://github.com/mudutv/example-webrtc-applications)** contains more full featured examples that use 3rd party libraries.
 
-The Pion WebRTC API closely matches the JavaScript **[WebRTC API](https://w3c.github.io/webrtc-pc/)**. Most existing documentation is therefore also useful when working with Pion. Furthermore, our **[GoDoc](https://godoc.org/github.com/mudutv/webrtc)** is actively maintained.
+**[awesome-pion](https://github.com/mudutv/awesome-pion)** contains projects that have used Pion, and serve as real world examples of usage.
 
-We maintain a [FAQ](https://pion.ly/knowledge-base/pion-basics/faq/) with answers to common questions. If you have a question not covered please submit a PR, we would be happy to answer it!
+**[GoDoc](https://godoc.org/github.com/mudutv/webrtc)** is an auto generated API reference. All our Public APIs are commented.
 
-Now go forth and build some awesome apps! Here are some **ideas** to get your creative juices flowing:
+**[FAQ](https://github.com/mudutv/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in [Slack](https://pion.ly/slack) we are always looking to expand it.
+
+Now go build something awesome! Here are some **ideas** to get your creative juices flowing:
 * Send a video file to multiple browser in real time for perfectly synchronized movie watching.
 * Send a webcam on an embedded device to your browser with no additional server required!
 * Securely send data between two servers, without using pub/sub.
@@ -47,7 +55,7 @@ Now go forth and build some awesome apps! Here are some **ideas** to get your cr
 * Build a conferencing application that processes audio/video and make decisions off of it.
 
 ### WebAssembly
-Pion WebRTC can be used when compiled to WebAssembly, also known as Wasm. In
+Pion WebRTC can be used when compiled to WebAssembly, also known as WASM. In
 this case the library will act as a wrapper around the JavaScript WebRTC API.
 This allows you to use WebRTC from Go in both server and browser side code with
 little to no changes. Check out the
@@ -58,24 +66,16 @@ for more information.
 
 ### Roadmap
 The library is in active development, please refer to the [roadmap](https://github.com/mudutv/webrtc/issues/9) to track our major milestones.
+We also maintain a list of [Big Ideas](https://github.com/mudutv/webrtc/wiki/Big-Ideas) these are things we want to build but don't have a clear plan or the resources yet.
+If you are looking to get involved this is a great place to get started! We would also love to hear your ideas! Even if you can't implement it yourself, it could inspire others.
 
 ### Community
-Pion has an active community on the [Golang Slack](https://invite.slack.golangbridge.org/). Sign up and join the **#pion** channel for discussions and support. You can also use [Pion mailing list](https://groups.google.com/forum/#!forum/pion).
+Pion has an active community on the [Slack](https://pion.ly/slack).
+
+Follow the [Pion Twitter](https://twitter.com/_pion) for project updates and important WebRTC news.
 
 We are always looking to support **your projects**. Please reach out if you have something to build!
-
 If you need commercial support or don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
-
-
-### Project status
-
-[![Stargazers over time](https://starchart.cc/pion/webrtc.svg)](https://starchart.cc/pion/webrtc)
-
-
-
-### Related projects
-* [pion/turn](https://github.com/mudutv/turn): A simple extendable Golang TURN server
-* [WIP] [pion/media-server](https://github.com/mudutv/media-server): A Pion WebRTC powered media server, providing the building blocks for anything RTC.
 
 ### Contributing
 Check out the **[contributing wiki](https://github.com/mudutv/webrtc/wiki/Contributing)** to join the group of amazing people making this project possible:
@@ -140,6 +140,46 @@ Check out the **[contributing wiki](https://github.com/mudutv/webrtc/wiki/Contri
 * [Chris Hiszpanski](https://github.com/thinkski) - *Fix Answer bundle generation*
 * [Vicken Simonian](https://github.com/vsimon)
 * [Guilherme Souza](https://github.com/gqgs)
+* [Andrew N. Shalaev](https://github.com/isqad)
+* [David Hamilton](https://github.com/dihamilton)
+* [Ilya Mayorov](https://github.com/faroyam)
+* [Patrick Lange](https://github.com/langep)
+* [cyannuk](https://github.com/cyannuk)
+* [Lukas Herman](https://github.com/lherman-cs)
+* [Konstantin Chugalinskiy](https://github.com/kchugalinskiy)
+* [Bao Nguyen](https://github.com/sysbot)
+* [Luke S](https://github.com/encounter)
+* [Hendrik Hofstadt](https://github.com/hendrikhofstadt)
+* [Clayton McCray](https://github.com/ClaytonMcCray)
+* [lawl](https://github.com/lawl)
+* [Jorropo](https://github.com/Jorropo)
+* [Akil](https://github.com/akilude)
+* [Quentin Renard](https://github.com/asticode)
+* [opennota](https://github.com/opennota)
+* [Simon Eisenmann](https://github.com/longsleep)
+* [Ben Weitzman](https://github.com/benweitzman)
+* [Masahiro Nakamura](https://github.com/tsuu32)
+* [Tarrence van As](https://github.com/tarrencev)
+* [Yuki Igarashi](https://github.com/bonprosoft)
+* [Egon Elbre](https://github.com/egonelbre)
+* [Jerko Steiner](https://github.com/jeremija)
+* [Roman Romanenko](https://github.com/r-novel)
+* [YongXin SHI](https://github.com/a-wing)
+* [Magnus Wahlstrand](https://github.com/kyeett)
+* [Chad Retz](https://github.com/cretz)
+* [Simone Gotti](https://github.com/sgotti)
+* [Cedric Fung](https://github.com/cedricfung)
+* [Norman Rasmussen](https://github.com/normanr) - *Fix Empty DataChannel messages*
+* [salmān aljammāz](https://github.com/saljam)
+* [cnderrauber](https://github.com/cnderrauber)
+* [Juliusz Chroboczek](https://github.com/jech)
+* [John Berthels](https://github.com/jbert)
+* [Somers Matthews](https://github.com/somersbmatthews)
+* [Vitaliy F](https://github.com/funvit)
+* [Ivan Egorov](https://github.com/vany-egorov)
+* [Nick Mykins](https://github.com/nmyk)
+* [Jason Brady](https://github.com/jbrady42)
+* [krishna chiatanya](https://github.com/kittuov)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

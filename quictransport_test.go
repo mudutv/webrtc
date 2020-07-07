@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/quic"
+	"github.com/mudutv/quic"
 	"github.com/mudutv/transport/test"
-	"github.com/mudutv/webrtc/v2/internal/util"
+	"github.com/mudutv/webrtc/v3/internal/util"
 )
 
 func TestQUICTransport_E2E(t *testing.T) {

@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/mudutv/rtcp"
-	"github.com/mudutv/webrtc/v2"
-	"github.com/mudutv/webrtc/v2/pkg/media"
-	"github.com/mudutv/webrtc/v2/pkg/media/ivfwriter"
-	"github.com/mudutv/webrtc/v2/pkg/media/oggwriter"
+	"github.com/mudutv/webrtc/v3"
+	"github.com/mudutv/webrtc/v3/pkg/media"
+	"github.com/mudutv/webrtc/v3/pkg/media/ivfwriter"
+	"github.com/mudutv/webrtc/v3/pkg/media/oggwriter"
 
-	"github.com/mudutv/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v3/examples/internal/signal"
 )
 
 func saveToDisk(i media.Writer, track *webrtc.Track) {
@@ -62,9 +62,9 @@ func main() {
 	}
 
 	// Allow us to receive 1 audio track, and 1 video track
-	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+	if _, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio); err != nil {
 		panic(err)
-	} else if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+	} else if _, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo); err != nil {
 		panic(err)
 	}
 
@@ -142,14 +142,22 @@ func main() {
 		panic(err)
 	}
 
+	// Create channel that is blocked until ICE Gathering is complete
+	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
 	if err != nil {
 		panic(err)
 	}
 
+	// Block until ICE Gathering is complete, disabling trickle ICE
+	// we do this because we only can exchange one signaling message
+	// in a production application you should exchange ICE Candidates via OnICECandidate
+	<-gatherComplete
+
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(answer))
+	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
 	// Block forever
 	select {}

@@ -264,6 +264,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	})
 	assert.NoError(t, answerDC.Close())
 	waitWithTimeout(t, &dcWait)
+	time.Sleep(10 * time.Millisecond)
 
 	reportPCOffer = offerPC.GetStats()
 	reportPCAnswer = answerPC.GetStats()
@@ -281,7 +282,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.Equal(t, uint32(1), connStatsAnswer.DataChannelsClosed)
 	assert.Equal(t, uint32(0), connStatsAnswer.DataChannelsRequested)
 	assert.Equal(t, uint32(1), connStatsAnswer.DataChannelsAccepted)
-	dcStatsAnswer = getDataChannelStats(t, reportPCOffer, answerDC)
+	dcStatsAnswer = getDataChannelStats(t, reportPCAnswer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
 
 	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
@@ -296,4 +297,13 @@ func TestPeerConnection_GetStats(t *testing.T) {
 
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
+}
+
+func TestPeerConnection_GetStats_Closed(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, pc.Close())
+
+	pc.GetStats()
 }

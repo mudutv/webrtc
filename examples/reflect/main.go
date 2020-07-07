@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/mudutv/rtcp"
-	"github.com/mudutv/webrtc/v2"
-	"github.com/mudutv/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v3"
+	"github.com/mudutv/webrtc/v3/examples/internal/signal"
 )
 
 func main() {
@@ -50,11 +50,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// Set the remote SessionDescription
-	err = peerConnection.SetRemoteDescription(offer)
-	if err != nil {
-		panic(err)
-	}
 
 	// Create Track that we send video back to browser on
 	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video", "pion")
@@ -64,6 +59,12 @@ func main() {
 
 	// Add this newly created track to the PeerConnection
 	if _, err = peerConnection.AddTrack(outputTrack); err != nil {
+		panic(err)
+	}
+
+	// Set the remote SessionDescription
+	err = peerConnection.SetRemoteDescription(offer)
+	if err != nil {
 		panic(err)
 	}
 
@@ -111,14 +112,22 @@ func main() {
 		panic(err)
 	}
 
+	// Create channel that is blocked until ICE Gathering is complete
+	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
 	if err != nil {
 		panic(err)
 	}
 
+	// Block until ICE Gathering is complete, disabling trickle ICE
+	// we do this because we only can exchange one signaling message
+	// in a production application you should exchange ICE Candidates via OnICECandidate
+	<-gatherComplete
+
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(answer))
+	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
 	// Block forever
 	select {}

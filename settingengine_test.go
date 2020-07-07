@@ -35,19 +35,15 @@ func TestSetEphemeralUDPPortRange(t *testing.T) {
 func TestSetConnectionTimeout(t *testing.T) {
 	s := SettingEngine{}
 
-	if s.timeout.ICEConnection != nil ||
-		s.timeout.ICEKeepalive != nil {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	var nilDuration *time.Duration
+	assert.Equal(t, s.timeout.ICEDisconnectedTimeout, nilDuration)
+	assert.Equal(t, s.timeout.ICEFailedTimeout, nilDuration)
+	assert.Equal(t, s.timeout.ICEKeepaliveInterval, nilDuration)
 
-	s.SetConnectionTimeout(5*time.Second, 1*time.Second)
-
-	if s.timeout.ICEConnection == nil ||
-		*s.timeout.ICEConnection != 5*time.Second ||
-		s.timeout.ICEKeepalive == nil ||
-		*s.timeout.ICEKeepalive != 1*time.Second {
-		t.Fatalf("ICE Timeouts do not reflect requested values.")
-	}
+	s.SetICETimeouts(1*time.Second, 2*time.Second, 3*time.Second)
+	assert.Equal(t, *s.timeout.ICEDisconnectedTimeout, 1*time.Second)
+	assert.Equal(t, *s.timeout.ICEFailedTimeout, 2*time.Second)
+	assert.Equal(t, *s.timeout.ICEKeepaliveInterval, 3*time.Second)
 }
 
 func TestDetachDataChannels(t *testing.T) {
@@ -88,4 +84,31 @@ func TestSetAnsweringDTLSRole(t *testing.T) {
 	s := SettingEngine{}
 	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRoleAuto), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
 	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRole(0)), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
+}
+
+func TestSetReplayProtection(t *testing.T) {
+	s := SettingEngine{}
+
+	if s.replayProtection.DTLS != nil ||
+		s.replayProtection.SRTP != nil ||
+		s.replayProtection.SRTCP != nil {
+		t.Fatalf("SettingEngine defaults aren't as expected.")
+	}
+
+	s.SetDTLSReplayProtectionWindow(128)
+	s.SetSRTPReplayProtectionWindow(64)
+	s.SetSRTCPReplayProtectionWindow(32)
+
+	if s.replayProtection.DTLS == nil ||
+		*s.replayProtection.DTLS != 128 {
+		t.Errorf("Failed to set DTLS replay protection window")
+	}
+	if s.replayProtection.SRTP == nil ||
+		*s.replayProtection.SRTP != 64 {
+		t.Errorf("Failed to set SRTP replay protection window")
+	}
+	if s.replayProtection.SRTCP == nil ||
+		*s.replayProtection.SRTCP != 32 {
+		t.Errorf("Failed to set SRTCP replay protection window")
+	}
 }

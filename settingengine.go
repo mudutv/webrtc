@@ -6,8 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/mudutv/ice"
+	"github.com/mudutv/ice/v2"
 	"github.com/mudutv/logging"
+	"github.com/mudutv/sdp/v2"
+	"github.com/mudutv/transport/vnet"
 )
 
 // SettingEngine allows influencing behavior in ways that are not
@@ -22,24 +24,38 @@ type SettingEngine struct {
 		DataChannels bool
 	}
 	timeout struct {
-		ICEConnection                *time.Duration
-		ICEKeepalive                 *time.Duration
-		ICECandidateSelectionTimeout *time.Duration
-		ICEHostAcceptanceMinWait     *time.Duration
-		ICESrflxAcceptanceMinWait    *time.Duration
-		ICEPrflxAcceptanceMinWait    *time.Duration
-		ICERelayAcceptanceMinWait    *time.Duration
+		ICEDisconnectedTimeout    *time.Duration
+		ICEFailedTimeout          *time.Duration
+		ICEKeepaliveInterval      *time.Duration
+		ICEHostAcceptanceMinWait  *time.Duration
+		ICESrflxAcceptanceMinWait *time.Duration
+		ICEPrflxAcceptanceMinWait *time.Duration
+		ICERelayAcceptanceMinWait *time.Duration
 	}
 	candidates struct {
-		ICELite                bool
-		ICETrickle             bool
-		ICENetworkTypes        []NetworkType
-		InterfaceFilter        func(string) bool
-		NAT1To1IPs             []string
-		NAT1To1IPCandidateType ICECandidateType
+		ICELite                        bool
+		ICENetworkTypes                []NetworkType
+		InterfaceFilter                func(string) bool
+		NAT1To1IPs                     []string
+		NAT1To1IPCandidateType         ICECandidateType
+		GenerateMulticastDNSCandidates bool
+		MulticastDNSHostName           string
+		UsernameFragment               string
+		Password                       string
 	}
-	answeringDTLSRole DTLSRole
-	LoggerFactory     logging.LoggerFactory
+	replayProtection struct {
+		DTLS  *uint
+		SRTP  *uint
+		SRTCP *uint
+	}
+	sdpMediaLevelFingerprints                 bool
+	sdpExtensions                             map[SDPSectionType][]sdp.ExtMap
+	answeringDTLSRole                         DTLSRole
+	disableCertificateFingerprintVerification bool
+	disableSRTPReplayProtection               bool
+	disableSRTCPReplayProtection              bool
+	vnet                                      *vnet.Net
+	LoggerFactory                             logging.LoggerFactory
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -49,16 +65,14 @@ func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
 }
 
-// SetConnectionTimeout sets the amount of silence needed on a given candidate pair
-// before the ICE agent considers the pair timed out.
-func (e *SettingEngine) SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
-	e.timeout.ICEConnection = &connectionTimeout
-	e.timeout.ICEKeepalive = &keepAlive
-}
-
-// SetCandidateSelectionTimeout sets the max ICECandidateSelectionTimeout
-func (e *SettingEngine) SetCandidateSelectionTimeout(t time.Duration) {
-	e.timeout.ICECandidateSelectionTimeout = &t
+// SetICETimeouts sets the behavior around ICE Timeouts
+// * disconnectedTimeout is the duration without network activity before a Agent is considered disconnected. Default is 5 Seconds
+// * failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
+// * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
+func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepAliveInterval time.Duration) {
+	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
+	e.timeout.ICEFailedTimeout = &failedTimeout
+	e.timeout.ICEKeepaliveInterval = &keepAliveInterval
 }
 
 // SetHostAcceptanceMinWait sets the ICEHostAcceptanceMinWait
@@ -97,12 +111,6 @@ func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error 
 // SetLite configures whether or not the ice agent should be a lite agent
 func (e *SettingEngine) SetLite(lite bool) {
 	e.candidates.ICELite = lite
-}
-
-// SetTrickle configures whether or not the ice agent should gather candidates
-// via the trickle method or synchronously.
-func (e *SettingEngine) SetTrickle(trickle bool) {
-	e.candidates.ICETrickle = trickle
 }
 
 // SetNetworkTypes configures what types of candidate networks are supported
@@ -162,4 +170,136 @@ func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 
 	e.answeringDTLSRole = role
 	return nil
+}
+
+// SetVNet sets the VNet instance that is passed to pion/ice
+//
+// VNet is a virtual network layer for Pion, allowing users to simulate
+// different topologies, latency, loss and jitter. This can be useful for
+// learning WebRTC concepts or testing your application in a lab environment
+func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
+	e.vnet = vnet
+}
+
+// GenerateMulticastDNSCandidates instructs pion/ice to generate host candidates with mDNS hostnames instead of IP Addresses
+func (e *SettingEngine) GenerateMulticastDNSCandidates(generateMulticastDNSCandidates bool) {
+	e.candidates.GenerateMulticastDNSCandidates = generateMulticastDNSCandidates
+}
+
+// SetMulticastDNSHostName sets a static HostName to be used by pion/ice instead of generating one on startup
+//
+// This should only be used for a single PeerConnection. Having multiple PeerConnections with the same HostName will cause
+// undefined behavior
+func (e *SettingEngine) SetMulticastDNSHostName(hostName string) {
+	e.candidates.MulticastDNSHostName = hostName
+}
+
+// SetICECredentials sets a staic uFrag/uPwd to be used by pion/ice
+//
+// This is useful if you want to do signalless WebRTC session, or having a reproducible environment with static credentials
+func (e *SettingEngine) SetICECredentials(usernameFragment, password string) {
+	e.candidates.UsernameFragment = usernameFragment
+	e.candidates.Password = password
+}
+
+// DisableCertificateFingerprintVerification disables fingerprint verification after DTLS Handshake has finished
+func (e *SettingEngine) DisableCertificateFingerprintVerification(isDisabled bool) {
+	e.disableCertificateFingerprintVerification = isDisabled
+}
+
+// SetDTLSReplayProtectionWindow sets a replay attack protection window size of DTLS connection.
+func (e *SettingEngine) SetDTLSReplayProtectionWindow(n uint) {
+	e.replayProtection.DTLS = &n
+}
+
+// SetSRTPReplayProtectionWindow sets a replay attack protection window size of SRTP session.
+func (e *SettingEngine) SetSRTPReplayProtectionWindow(n uint) {
+	e.disableSRTPReplayProtection = false
+	e.replayProtection.SRTP = &n
+}
+
+// SetSRTCPReplayProtectionWindow sets a replay attack protection window size of SRTCP session.
+func (e *SettingEngine) SetSRTCPReplayProtectionWindow(n uint) {
+	e.disableSRTCPReplayProtection = false
+	e.replayProtection.SRTCP = &n
+}
+
+// DisableSRTPReplayProtection disables SRTP replay protection.
+func (e *SettingEngine) DisableSRTPReplayProtection(isDisabled bool) {
+	e.disableSRTPReplayProtection = isDisabled
+}
+
+// DisableSRTCPReplayProtection disables SRTCP replay protection.
+func (e *SettingEngine) DisableSRTCPReplayProtection(isDisabled bool) {
+	e.disableSRTCPReplayProtection = isDisabled
+}
+
+// SetSDPMediaLevelFingerprints configures the logic for DTLS Fingerprint insertion
+// If true, fingerprints will be inserted in the sdp at the fingerprint
+// level, instead of the session level. This helps with compatibility with
+// some webrtc implementations.
+func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints bool) {
+	e.sdpMediaLevelFingerprints = sdpMediaLevelFingerprints
+}
+
+// AddSDPExtensions adds available and offered extensions for media type.
+//
+// Ext IDs are optional and generated if you do not provide them
+// SDP answers will only include extensions supported by both sides
+func (e *SettingEngine) AddSDPExtensions(mediaType SDPSectionType, exts []sdp.ExtMap) {
+	if e.sdpExtensions == nil {
+		e.sdpExtensions = make(map[SDPSectionType][]sdp.ExtMap)
+	}
+	if _, ok := e.sdpExtensions[mediaType]; !ok {
+		e.sdpExtensions[mediaType] = []sdp.ExtMap{}
+	}
+	e.sdpExtensions[mediaType] = append(e.sdpExtensions[mediaType], exts...)
+}
+
+func (e *SettingEngine) getSDPExtensions() map[SDPSectionType][]sdp.ExtMap {
+	var lastID int
+	idMap := map[string]int{}
+
+	// Build provided ext id map
+	for _, extList := range e.sdpExtensions {
+		for _, ext := range extList {
+			if ext.Value != 0 {
+				idMap[ext.URI.String()] = ext.Value
+			}
+		}
+	}
+
+	// Find next available ID
+	nextID := func() {
+		var done bool
+		for !done {
+			lastID++
+			var found bool
+			for _, v := range idMap {
+				if lastID == v {
+					found = true
+					break
+				}
+			}
+			if !found {
+				done = true
+			}
+		}
+	}
+
+	// Assign missing IDs across all media types based on URI
+	for mType, extList := range e.sdpExtensions {
+		for i, ext := range extList {
+			if ext.Value == 0 {
+				if id, ok := idMap[ext.URI.String()]; ok {
+					e.sdpExtensions[mType][i].Value = id
+				} else {
+					nextID()
+					e.sdpExtensions[mType][i].Value = lastID
+					idMap[ext.URI.String()] = lastID
+				}
+			}
+		}
+	}
+	return e.sdpExtensions
 }

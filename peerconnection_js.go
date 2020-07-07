@@ -6,7 +6,8 @@ package webrtc
 import (
 	"syscall/js"
 
-	"github.com/mudutv/webrtc/v2/pkg/rtcerr"
+	"github.com/mudutv/sdp/v2"
+	"github.com/mudutv/webrtc/v3/pkg/rtcerr"
 )
 
 // PeerConnection represents a WebRTC connection that establishes a
@@ -24,6 +25,9 @@ type PeerConnection struct {
 	onICEConnectionStateChangeHandler *js.Func
 	onICECandidateHandler             *js.Func
 	onICEGatheringStateChangeHandler  *js.Func
+
+	// Used by GatheringCompletePromise
+	onGatherCompleteHandler func()
 
 	// A reference to the associated API state used by this connection
 	api *API
@@ -48,6 +52,10 @@ func (api *API) NewPeerConnection(configuration Configuration) (_ *PeerConnectio
 		underlying: underlying,
 		api:        api,
 	}, nil
+}
+
+func (pc *PeerConnection) JSValue() js.Value {
+	return pc.underlying
 }
 
 // OnSignalingStateChange sets an event handler which is invoked when the
@@ -308,6 +316,10 @@ func (pc *PeerConnection) OnICECandidate(f func(candidate *ICECandidate)) {
 	}
 	onICECandidateHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		candidate := valueToICECandidate(args[0].Get("candidate"))
+		if candidate == nil && pc.onGatherCompleteHandler != nil {
+			go pc.onGatherCompleteHandler()
+		}
+
 		go f(candidate)
 		return js.Undefined()
 	})
@@ -447,6 +459,16 @@ func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 	return newPeerConnectionState(rawState)
 }
 
+func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {
+	pc.onGatherCompleteHandler = hdlr
+
+	// If no onIceCandidate handler has been set provide an empty one
+	// otherwise our onGatherCompleteHandler will not be executed
+	if pc.onICECandidateHandler == nil {
+		pc.OnICECandidate(func(i *ICECandidate) {})
+	}
+}
+
 // Converts a Configuration to js.Value so it can be passed
 // through to the JavaScript WebRTC API. Any zero values are converted to
 // js.Undefined(), which will result in the default value being used.
@@ -486,7 +508,7 @@ func iceServerToValue(server ICEServer) js.Value {
 }
 
 func valueToConfiguration(configValue js.Value) Configuration {
-	if configValue == js.Null() || configValue == js.Undefined() {
+	if jsValueIsNull(configValue) || jsValueIsUndefined(configValue) {
 		return Configuration{}
 	}
 	return Configuration{
@@ -503,7 +525,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 }
 
 func valueToICEServers(iceServersValue js.Value) []ICEServer {
-	if iceServersValue == js.Null() || iceServersValue == js.Undefined() {
+	if jsValueIsNull(iceServersValue) || jsValueIsUndefined(iceServersValue) {
 		return nil
 	}
 	iceServers := make([]ICEServer, iceServersValue.Length())
@@ -524,8 +546,21 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 }
 
 func valueToICECandidate(val js.Value) *ICECandidate {
-	if val == js.Null() || val == js.Undefined() {
+	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return nil
+	}
+	if jsValueIsUndefined(val.Get("protocol")) && !jsValueIsUndefined(val.Get("candidate")) {
+		// Missing some fields, assume it's Firefox and parse SDP candidate.
+		attribute := sdp.NewAttribute("candidate", val.Get("candidate").String())
+		sdpCandidate, err := attribute.ToICECandidate()
+		if err != nil {
+			return nil
+		}
+		iceCandidate, err := newICECandidateFromSDP(sdpCandidate)
+		if err != nil {
+			return nil
+		}
+		return &iceCandidate
 	}
 	protocol, _ := NewICEProtocol(val.Get("protocol").String())
 	candidateType, _ := NewICECandidateType(val.Get("type").String())
@@ -564,7 +599,7 @@ func sessionDescriptionToValue(desc *SessionDescription) js.Value {
 }
 
 func valueToSessionDescription(descValue js.Value) *SessionDescription {
-	if descValue == js.Null() || descValue == js.Undefined() {
+	if jsValueIsNull(descValue) || jsValueIsUndefined(descValue) {
 		return nil
 	}
 	return &SessionDescription{

@@ -7,5 +7,8 @@ const (
 	unknownStr = "unknown"
 	ssrcStr    = "ssrc"
 
-	receiveMTU = 8192
+	// Equal to UDP MTU
+	receiveMTU = 1460
+
+	mediaSectionApplication = "application"
 )

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mudutv/ice"
+	"github.com/mudutv/ice/v2"
 )
 
 // A Stats object contains a set of statistics copies out of a monitored component

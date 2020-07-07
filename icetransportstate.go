@@ -1,6 +1,6 @@
 package webrtc
 
-import "github.com/mudutv/ice"
+import "github.com/mudutv/ice/v2"
 
 // ICETransportState represents the current state of the ICE transport.
 type ICETransportState int

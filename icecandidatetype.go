@@ -3,7 +3,7 @@ package webrtc
 import (
 	"fmt"
 
-	"github.com/mudutv/ice"
+	"github.com/mudutv/ice/v2"
 )
 
 // ICECandidateType represents the type of the ICE candidate used.

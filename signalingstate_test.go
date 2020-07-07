@@ -3,7 +3,7 @@ package webrtc
 import (
 	"testing"
 
-	"github.com/mudutv/webrtc/v2/pkg/rtcerr"
+	"github.com/mudutv/webrtc/v3/pkg/rtcerr"
 
 	"github.com/stretchr/testify/assert"
 )

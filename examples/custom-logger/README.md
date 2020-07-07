@@ -6,7 +6,8 @@ users to override this and process messages however they want.
 ## Instructions
 ### Download custom-logger
 ```
-go get github.com/mudutv/webrtc/examples/custom-logger
+export GO111MODULE=on
+go get github.com/mudutv/webrtc/v3/examples/custom-logger
 ```
 
 ### Run custom-logger

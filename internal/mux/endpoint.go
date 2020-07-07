@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/mudutv/ice"
+	"github.com/mudutv/ice/v2"
 	"github.com/mudutv/transport/packetio"
 )
 

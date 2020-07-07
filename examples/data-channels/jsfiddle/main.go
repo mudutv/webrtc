@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"syscall/js"
 
-	"github.com/mudutv/webrtc/v2"
-	"github.com/mudutv/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v3"
+	"github.com/mudutv/webrtc/v3/examples/internal/signal"
 )
 
 func main() {

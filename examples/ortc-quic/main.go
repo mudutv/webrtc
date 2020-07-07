@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pion/quic"
-	"github.com/mudutv/webrtc/v2"
+	"github.com/mudutv/quic"
+	"github.com/mudutv/webrtc/v3"
 
-	"github.com/mudutv/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v3/examples/internal/signal"
 )
 
 const messageSize = 15
@@ -59,11 +59,20 @@ func main() {
 		go WriteLoop(stream)
 	})
 
+	gatherFinished := make(chan struct{})
+	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		}
+	})
+
 	// Gather candidates
 	err = gatherer.Gather()
 	if err != nil {
 		panic(err)
 	}
+
+	<-gatherFinished
 
 	iceCandidates, err := gatherer.GetLocalCandidates()
 	if err != nil {

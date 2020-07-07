@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mudutv/webrtc/v2"
+	"github.com/mudutv/webrtc/v3"
 
-	"github.com/mudutv/webrtc/v2/examples/internal/signal"
+	"github.com/mudutv/webrtc/v3/examples/internal/signal"
 )
 
 func main() {
@@ -55,11 +55,20 @@ func main() {
 		})
 	})
 
+	gatherFinished := make(chan struct{})
+	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		}
+	})
+
 	// Gather candidates
 	err = gatherer.Gather()
 	if err != nil {
 		panic(err)
 	}
+
+	<-gatherFinished
 
 	iceCandidates, err := gatherer.GetLocalCandidates()
 	if err != nil {
@@ -120,9 +129,11 @@ func main() {
 
 	// Construct the data channel as the offerer
 	if *isOffer {
+		var id uint16 = 1
+
 		dcParams := &webrtc.DataChannelParameters{
 			Label: "Foo",
-			ID:    1,
+			ID:    &id,
 		}
 		var channel *webrtc.DataChannel
 		channel, err = api.NewDataChannel(sctp, dcParams)

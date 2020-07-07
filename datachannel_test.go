@@ -15,13 +15,27 @@ import (
 // bindings this is a requirement).
 const expectedLabel = "data"
 
-func closePair(t *testing.T, pc1, pc2 io.Closer, done chan bool) {
+func closePairNow(t *testing.T, pc1, pc2 io.Closer) {
+	var fail bool
+	if err := pc1.Close(); err != nil {
+		t.Errorf("Failed to close PeerConnection: %v", err)
+		fail = true
+	}
+	if err := pc2.Close(); err != nil {
+		t.Errorf("Failed to close PeerConnection: %v", err)
+		fail = true
+	}
+	if fail {
+		t.FailNow()
+	}
+}
+
+func closePair(t *testing.T, pc1, pc2 io.Closer, done <-chan bool) {
 	select {
 	case <-time.After(10 * time.Second):
 		t.Fatalf("closePair timed out waiting for done signal")
 	case <-done:
-		assert.NoError(t, pc1.Close())
-		assert.NoError(t, pc2.Close())
+		closePairNow(t, pc1, pc2)
 	}
 }
 
@@ -70,7 +84,11 @@ func TestDataChannel_Open(t *testing.T) {
 				openCalls <- true
 			})
 			d.OnMessage(func(msg DataChannelMessage) {
-				done <- true
+				go func() {
+					// Wait a little bit to ensure all messages are processed.
+					time.Sleep(100 * time.Millisecond)
+					done <- true
+				}()
 			})
 		})
 
@@ -208,6 +226,35 @@ func TestDataChannel_Send(t *testing.T) {
 		}
 
 		closePair(t, offerPC, answerPC, done)
+	})
+}
+
+func TestDataChannel_Close(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	t.Run("Close after PeerConnection Closed", func(t *testing.T) {
+		offerPC, answerPC, err := newPair()
+		assert.NoError(t, err)
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, offerPC.Close())
+		assert.NoError(t, answerPC.Close())
+		assert.NoError(t, dc.Close())
+	})
+
+	t.Run("Close before connected", func(t *testing.T) {
+		offerPC, answerPC, err := newPair()
+		assert.NoError(t, err)
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, dc.Close())
+		assert.NoError(t, offerPC.Close())
+		assert.NoError(t, answerPC.Close())
 	})
 }
 

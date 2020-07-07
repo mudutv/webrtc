@@ -1,6 +1,7 @@
-FROM golang:1.12
+FROM golang:1.14
 
-RUN go get -u github.com/mudutv/webrtc/examples/pion-to-pion/answer
+ENV GO111MODULE=on
+RUN go get -u github.com/mudutv/webrtc/v3/examples/pion-to-pion/answer
 
 CMD ["answer"]
 

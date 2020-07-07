@@ -42,15 +42,39 @@
 		"type": "browser"
 	},
 	{
+		"title": "Play from Disk Renegotation",
+		"link": "play-from-disk",
+		"description": "The play-from-disk-renegotation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.",
+		"type": "browser"
+	},
+	{
+		"title": "Insertable Streams",
+		"link": "insertable-streams",
+		"description": "The insertable-streams example demonstrates how Pion can be used to send E2E encrypted video and decrypt via insertable streams in the browser.",
+		"type": "browser"
+	},
+	{
 		"title": "Save to Disk",
 		"link": "save-to-disk",
 		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",
 		"type": "browser"
 	},
 	{
-		"title": "SFU Minimal",
-		"link": "sfu-minimal",
-		"description": "The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
+		"title": "Broadcast",
+		"link": "broadcast",
+		"description": "The broadcast example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
+		"type": "browser"
+	},
+	{
+		"title": "RTP Forwarder",
+		"link": "rtp-forwarder",
+		"description": "The rtp-forwarder example demonstrates how to forward your audio/video streams using RTP.",
+		"type": "browser"
+	},
+	{
+		"title": "RTP to WebRTC",
+		"link": "rtp-to-webrtc",
+		"description": "The rtp-to-webrtc example demonstrates how to take RTP packets sent to a Pion process into your browser.",
 		"type": "browser"
 	},
 	{

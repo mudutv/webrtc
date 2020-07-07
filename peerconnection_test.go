@@ -1,7 +1,6 @@
 package webrtc
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -9,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mudutv/logging"
-	"github.com/mudutv/webrtc/v2/pkg/rtcerr"
+	"github.com/mudutv/transport/test"
+	"github.com/mudutv/webrtc/v3/pkg/rtcerr"
 )
 
 // newPair creates two new peer connections (an offerer and an answerer)
@@ -30,13 +29,6 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 }
 
 func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
-	offerChan := make(chan SessionDescription)
-	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
-		if candidate == nil {
-			offerChan <- *pcOffer.PendingLocalDescription()
-		}
-	})
-
 	// Note(albrow): We need to create a data channel in order to trigger ICE
 	// candidate gathering in the background for the JavaScript/Wasm bindings. If
 	// we don't do this, the complete offer including ICE candidates will never be
@@ -49,72 +41,25 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	if err != nil {
 		return err
 	}
-	if err := pcOffer.SetLocalDescription(offer); err != nil {
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	if err = pcOffer.SetLocalDescription(offer); err != nil {
+		return err
+	}
+	<-offerGatheringComplete
+	if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
 		return err
 	}
 
-	timeout := time.After(3 * time.Second)
-	select {
-	case <-timeout:
-		return fmt.Errorf("timed out waiting to receive offer")
-	case offer := <-offerChan:
-		if err := pcAnswer.SetRemoteDescription(offer); err != nil {
-			return err
-		}
-
-		answer, err := pcAnswer.CreateAnswer(nil)
-		if err != nil {
-			return err
-		}
-
-		if err = pcAnswer.SetLocalDescription(answer); err != nil {
-			return err
-		}
-
-		err = pcOffer.SetRemoteDescription(answer)
-		if err != nil {
-			return err
-		}
-		return nil
+	answer, err := pcAnswer.CreateAnswer(nil)
+	if err != nil {
+		return err
 	}
-}
-
-// For testing route all messages through one callback
-type testCatchAllLeveledLogger struct {
-	callback func(string)
-}
-
-func (t testCatchAllLeveledLogger) handleMsg(format string, args ...interface{}) {
-	t.callback(fmt.Sprintf(format, args...))
-}
-
-func (t testCatchAllLeveledLogger) Trace(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Tracef(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Debug(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Debugf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Info(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Infof(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Warn(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Warnf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Error(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Errorf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-
-type testCatchAllLoggerFactory struct {
-	callback func(string)
-}
-
-func (t testCatchAllLoggerFactory) NewLogger(_ string) logging.LeveledLogger {
-	return testCatchAllLeveledLogger(t)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	if err = pcAnswer.SetLocalDescription(answer); err != nil {
+		return err
+	}
+	<-answerGatheringComplete
+	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
 }
 
 func TestNew(t *testing.T) {
@@ -258,6 +203,8 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
 			t.Errorf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
 		}
+
+		assert.NoError(t, pc.Close())
 	}
 }
 
@@ -279,7 +226,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	assert.Equal(t, expected.BundlePolicy, actual.BundlePolicy)
 	assert.Equal(t, expected.RTCPMuxPolicy, actual.RTCPMuxPolicy)
 	// TODO(albrow): Uncomment this after #513 is fixed.
-	// See: https://github.com/mudutv/webrtc/v2/issues/513.
+	// See: https://github.com/mudutv/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
 }
@@ -316,10 +263,12 @@ func TestSetRemoteDescription(t *testing.T) {
 		if err != nil {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
-		err = peerConn.SetRemoteDescription(testCase.desc)
-		if err != nil {
+
+		if err = peerConn.SetRemoteDescription(testCase.desc); err != nil {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
+
+		assert.NoError(t, peerConn.Close())
 	}
 }
 
@@ -354,6 +303,9 @@ func TestCreateOfferAnswer(t *testing.T) {
 	if err != nil {
 		t.Errorf("SetRemoteDescription (Originator): got error: %v", err)
 	}
+
+	assert.NoError(t, offerPeerConn.Close())
+	assert.NoError(t, answerPeerConn.Close())
 }
 
 func TestPeerConnection_EventHandlers(t *testing.T) {
@@ -450,34 +402,40 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	case <-timeout:
 		t.Fatalf("timed out waiting for one or more events handlers to be called (these *were* called: %+v)", wasCalled)
 	}
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestMultipleOfferAnswer(t *testing.T) {
-	nonTricklePeerConn, err := NewPeerConnection(Configuration{})
+	firstPeerConn, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
 
-	if _, err = nonTricklePeerConn.CreateOffer(nil); err != nil {
+	if _, err = firstPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("First Offer: got error: %v", err)
 	}
-	if _, err = nonTricklePeerConn.CreateOffer(nil); err != nil {
+	if _, err = firstPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
 
-	tricklePeerConn, err := NewPeerConnection(Configuration{})
+	secondPeerConn, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
-	tricklePeerConn.OnICECandidate(func(i *ICECandidate) {
+	secondPeerConn.OnICECandidate(func(i *ICECandidate) {
 	})
 
-	if _, err = tricklePeerConn.CreateOffer(nil); err != nil {
+	if _, err = secondPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("First Offer: got error: %v", err)
 	}
-	if _, err = tricklePeerConn.CreateOffer(nil); err != nil {
+	if _, err = secondPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
+
+	assert.NoError(t, firstPeerConn.Close())
+	assert.NoError(t, secondPeerConn.Close())
 }
 
 func TestNoFingerprintInFirstMediaIfSetRemoteDescription(t *testing.T) {
@@ -505,6 +463,9 @@ a=candidate:1 1 udp 2013266431 192.168.84.254 46492 typ host
 a=end-of-candidates
 `
 
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -515,8 +476,81 @@ a=end-of-candidates
 		SDP:  sdpNoFingerprintInFirstMedia,
 	}
 
-	err = pc.SetRemoteDescription(desc)
+	if err = pc.SetRemoteDescription(desc); err != nil {
+		t.Error(err.Error())
+	}
+
+	assert.NoError(t, pc.Close())
+}
+
+// Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
+func TestGatherOnSetLocalDescription(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOfferGathered := make(chan SessionDescription)
+	pcAnswerGathered := make(chan SessionDescription)
+
+	s := SettingEngine{}
+	api := NewAPI(WithSettingEngine(s))
+
+	pcOffer, err := api.NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
 	}
+
+	// We need to create a data channel in order to trigger ICE
+	if _, err = pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+		t.Error(err.Error())
+	}
+
+	pcOffer.OnICECandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(pcOfferGathered)
+		}
+	})
+
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	} else if err = pcOffer.SetLocalDescription(offer); err != nil {
+		t.Error(err.Error())
+	}
+
+	<-pcOfferGathered
+
+	pcAnswer, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	pcAnswer.OnICECandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(pcAnswerGathered)
+		}
+	})
+
+	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
+		t.Error(err.Error())
+	}
+
+	select {
+	case <-pcAnswerGathered:
+		t.Fatal("pcAnswer started gathering with no SetLocalDescription")
+	// Gathering is async, not sure of a better way to catch this currently
+	case <-time.After(3 * time.Second):
+	}
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	} else if err = pcAnswer.SetLocalDescription(answer); err != nil {
+		t.Error(err.Error())
+	}
+	<-pcAnswerGathered
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
