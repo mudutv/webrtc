@@ -7,8 +7,6 @@ import (
 	"io"
 	"sync"
 
-	"context"
-	"errors"
 	"github.com/mudutv/rtcp"
 	"github.com/mudutv/srtp"
 )
@@ -168,37 +166,37 @@ func (r *RTPReceiver) readRTP(b []byte) (n int, err error) {
 
 
 // miaobinwei
-func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
-	select {
-	case <-r.received:
-	case <-ctx.Done():
-		return 0, errors.New("poin read context done")
-	}
-
-	return r.rtcpReadStream.ReadContext(b,ctx)
-}
+//func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
+//	select {
+//	case <-r.received:
+//	case <-ctx.Done():
+//		return 0, errors.New("poin read context done")
+//	}
+//
+//	return r.rtcpReadStream.ReadContext(b,ctx)
+//}
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you miaobinwei
-func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := r.ReadContext(b,ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return rtcp.Unmarshal(b[:i])
-}
+//func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+//	b := make([]byte, receiveMTU)
+//	i, err := r.ReadContext(b,ctx)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return rtcp.Unmarshal(b[:i])
+//}
 
 // readRTP should only be called by a track, this only exists so we can keep state in one place miaobinwei
-func (r *RTPReceiver) readRTPContext(b []byte, ctx context.Context) (n int, err error) {
-	select {
-	case <-r.received:
-	case <-ctx.Done():
-		return 0, errors.New("poin read context done")
-
-	}
-
-	return r.rtpReadStream.ReadContext(b,ctx)
-}
+//func (r *RTPReceiver) readRTPContext(b []byte, ctx context.Context) (n int, err error) {
+//	select {
+//	case <-r.received:
+//	case <-ctx.Done():
+//		return 0, errors.New("poin read context done")
+//
+//	}
+//
+//	return r.rtpReadStream.ReadContext(b,ctx)
+//}
 
 

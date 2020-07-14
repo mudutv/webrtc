@@ -200,24 +200,24 @@ func (r *RTPSender) hasSent() bool {
 
 
 // miaobinwei
-func (r *RTPSender) ReadContext(b []byte,ctx context.Context) (n int, err error) {
-	select {
-	case <-r.sendCalled:
-	case <-ctx.Done():
-		return 0, errors.New("poin read context done")
-
-	}
-
-	return r.rtcpReadStream.ReadContext(b,ctx)
-}
+//func (r *RTPSender) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+//	select {
+//	case <-r.sendCalled:
+//	case <-ctx.Done():
+//		return 0, errors.New("poin read context done")
+//
+//	}
+//
+//	return r.rtcpReadStream.ReadContext(b,ctx)
+//}
 
 // miaobinwei
-func (r *RTPSender) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := r.ReadContext(b,ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return rtcp.Unmarshal(b[:i])
-}
+//func (r *RTPSender) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+//	b := make([]byte, receiveMTU)
+//	i, err := r.ReadContext(b,ctx)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return rtcp.Unmarshal(b[:i])
+//}

@@ -211,30 +211,30 @@ func (t *Track) determinePayloadType() error {
 
 
 // miaobinwei
-func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
-	t.mu.RLock()
-	if len(t.activeSenders) != 0 {
-		t.mu.RUnlock()
-		return 0, fmt.Errorf("this is a local track and must not be read from")
-	}
-	r := t.receiver
-	t.mu.RUnlock()
-
-	return r.readRTPContext(b,ctx)
-}
+//func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+//	t.mu.RLock()
+//	if len(t.activeSenders) != 0 {
+//		t.mu.RUnlock()
+//		return 0, fmt.Errorf("this is a local track and must not be read from")
+//	}
+//	r := t.receiver
+//	t.mu.RUnlock()
+//
+//	return r.readRTPContext(b,ctx)
+//}
 
 
 // miaobinwei
-func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := t.ReadContext(b,ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	r := &rtp.Packet{}
-	if err := r.Unmarshal(b[:i]); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
+//func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
+//	b := make([]byte, receiveMTU)
+//	i, err := t.ReadContext(b,ctx)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	r := &rtp.Packet{}
+//	if err := r.Unmarshal(b[:i]); err != nil {
+//		return nil, err
+//	}
+//	return r, nil
+//}
