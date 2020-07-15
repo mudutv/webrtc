@@ -9,6 +9,8 @@ import (
 
 	"github.com/mudutv/rtcp"
 	"github.com/mudutv/srtp"
+	"context"
+	"errors"
 )
 
 // RTPReceiver allows an application to inspect the receipt of a Track
@@ -108,6 +110,17 @@ func (r *RTPReceiver) Read(b []byte) (n int, err error) {
 	}
 }
 
+
+// miaobinwei
+func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
+	select {
+	case <-r.received:
+		return  r.rtcpReadStream.ReadContext(b,ctx)
+	case <-r.closed:
+		return 0, io.ErrClosedPipe
+	}
+}
+
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
@@ -118,6 +131,18 @@ func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 
 	return rtcp.Unmarshal(b[:i])
 }
+
+// miaobinwei
+func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.ReadContext(b,ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return rtcp.Unmarshal(b[:i])
+}
+
 
 func (r *RTPReceiver) haveReceived() bool {
 	select {
@@ -164,39 +189,15 @@ func (r *RTPReceiver) readRTP(b []byte) (n int, err error) {
 	return r.rtpReadStream.Read(b)
 }
 
-
 // miaobinwei
-//func (r *RTPReceiver) ReadContext(b []byte, ctx context.Context) (n int, err error) {
-//	select {
-//	case <-r.received:
-//	case <-ctx.Done():
-//		return 0, errors.New("poin read context done")
-//	}
-//
-//	return r.rtcpReadStream.ReadContext(b,ctx)
-//}
+func (r *RTPReceiver) readRTPContext(b []byte, ctx context.Context) (n int, err error) {
+	select {
+	case <-r.received:
+	case <-ctx.Done():
+		return 0, errors.New("poin read context done")
 
-// ReadRTCP is a convenience method that wraps Read and unmarshals for you miaobinwei
-//func (r *RTPReceiver) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
-//	b := make([]byte, receiveMTU)
-//	i, err := r.ReadContext(b,ctx)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return rtcp.Unmarshal(b[:i])
-//}
-
-// readRTP should only be called by a track, this only exists so we can keep state in one place miaobinwei
-//func (r *RTPReceiver) readRTPContext(b []byte, ctx context.Context) (n int, err error) {
-//	select {
-//	case <-r.received:
-//	case <-ctx.Done():
-//		return 0, errors.New("poin read context done")
-//
-//	}
-//
-//	return r.rtpReadStream.ReadContext(b,ctx)
-//}
+	}
+	return r.rtpReadStream.ReadContext(b,ctx)
+}
 
 

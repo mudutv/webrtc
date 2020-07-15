@@ -152,10 +152,33 @@ func (r *RTPSender) Read(b []byte) (n int, err error) {
 	}
 }
 
+// miaobinwei
+func (r *RTPSender) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+	select {
+	case <-r.sendCalled:
+		return r.rtcpReadStream.ReadContext(b,ctx)
+	case <-r.stopCalled:
+		return 0, io.ErrClosedPipe
+	case <-ctx.Done():
+		return 0, errors.New("poin read context done")
+	}
+}
+
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
 func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
 	i, err := r.Read(b)
+	if err != nil {
+		return nil, err
+	}
+
+	return rtcp.Unmarshal(b[:i])
+}
+
+// miaobinwei
+func (r *RTPSender) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.ReadContext(b,ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -199,25 +222,5 @@ func (r *RTPSender) hasSent() bool {
 }
 
 
-// miaobinwei
-//func (r *RTPSender) ReadContext(b []byte,ctx context.Context) (n int, err error) {
-//	select {
-//	case <-r.sendCalled:
-//	case <-ctx.Done():
-//		return 0, errors.New("poin read context done")
-//
-//	}
-//
-//	return r.rtcpReadStream.ReadContext(b,ctx)
-//}
 
-// miaobinwei
-//func (r *RTPSender) ReadRTCPContext(ctx context.Context) ([]rtcp.Packet, error) {
-//	b := make([]byte, receiveMTU)
-//	i, err := r.ReadContext(b,ctx)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return rtcp.Unmarshal(b[:i])
-//}
+

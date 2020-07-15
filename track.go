@@ -3,13 +3,12 @@
 package webrtc
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"sync"
-
 	"github.com/mudutv/rtp"
 	"github.com/mudutv/webrtc/v3/pkg/media"
-	"context"
+	"io"
+	"sync"
 )
 
 const (
@@ -99,10 +98,39 @@ func (t *Track) Read(b []byte) (n int, err error) {
 	return r.readRTP(b)
 }
 
+// miaobinwei
+func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
+	t.mu.RLock()
+	r := t.receiver
+
+	if t.totalSenderCount != 0 || r == nil {
+		t.mu.RUnlock()
+		return 0, fmt.Errorf("this is a local track and must not be read from")
+	}
+	t.mu.RUnlock()
+
+	return r.readRTPContext(b,ctx)
+}
+
 // ReadRTP is a convenience method that wraps Read and unmarshals for you
 func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	b := make([]byte, receiveMTU)
 	i, err := t.Read(b)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &rtp.Packet{}
+	if err := r.Unmarshal(b[:i]); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// miaobinwei
+func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := t.ReadContext(b,ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -210,31 +238,6 @@ func (t *Track) determinePayloadType() error {
 }
 
 
-// miaobinwei
-//func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
-//	t.mu.RLock()
-//	if len(t.activeSenders) != 0 {
-//		t.mu.RUnlock()
-//		return 0, fmt.Errorf("this is a local track and must not be read from")
-//	}
-//	r := t.receiver
-//	t.mu.RUnlock()
-//
-//	return r.readRTPContext(b,ctx)
-//}
 
 
-// miaobinwei
-//func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
-//	b := make([]byte, receiveMTU)
-//	i, err := t.ReadContext(b,ctx)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	r := &rtp.Packet{}
-//	if err := r.Unmarshal(b[:i]); err != nil {
-//		return nil, err
-//	}
-//	return r, nil
-//}
+
