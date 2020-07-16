@@ -9,10 +9,10 @@ require (
 	github.com/mudutv/logging v0.2.3-0.20200713015708-31395b91b76b
 	github.com/mudutv/quic v0.1.2-0.20200714104841-1448920d7531
 	github.com/mudutv/rtcp v1.2.2-0.20200713082714-d214eedcf11f
-	github.com/mudutv/rtp v1.1.5-0.20200714020244-c5b55fb036a9
-	github.com/mudutv/sctp v1.7.4-0.20200713081253-9617087d9060
+	github.com/mudutv/rtp v1.3.0
+	github.com/mudutv/sctp v1.7.4-0.20191210055525-b32197624b2b
 	github.com/mudutv/sdp/v2 v2.3.2-0.20200713062731-dc8f92752c21
-	github.com/mudutv/srtp v1.3.1
+	github.com/mudutv/srtp v1.2.7-0.20200714085025-29dc83a32ba7
 	github.com/mudutv/transport v1.3.0
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.6.1
