@@ -12,7 +12,7 @@ require (
 	github.com/mudutv/rtp v1.3.0
 	github.com/mudutv/sctp v1.7.4-0.20191210055525-b32197624b2b
 	github.com/mudutv/sdp/v2 v2.3.2-0.20200713062731-dc8f92752c21
-	github.com/mudutv/srtp v0.0.0-20200716082122-ef50451b382c
+	github.com/mudutv/srtp v1.2.7-0.20200714085025-29dc83a32ba7
 	github.com/mudutv/transport v1.3.0
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.6.1
