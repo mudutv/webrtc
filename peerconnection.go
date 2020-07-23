@@ -1224,6 +1224,40 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	return transceiver.Sender(), nil
 }
 
+// AddTrack adds a Track to the PeerConnection  miaobinwei
+func (pc *PeerConnection) AddTrackSetInit(track *Track,init ...RtpTransceiverInit) (*RTPSender, error) {
+	if pc.isClosed.get() {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	var transceiver *RTPTransceiver
+	for _, t := range pc.GetTransceivers() {
+		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
+			transceiver = t
+			break
+		}
+	}
+	if transceiver != nil {
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+		transceiver.setSender(sender)
+		// we still need to call setSendingTrack to ensure direction has changed
+		if err := transceiver.setSendingTrack(track); err != nil {
+			return nil, err
+		}
+		return sender, nil
+	}
+
+	transceiver, err := pc.AddTransceiverFromTrack(track,init...)
+	if err != nil {
+		return nil, err
+	}
+
+	return transceiver.Sender(), nil
+}
+
 // AddTransceiver Create a new RTCRtpTransceiver and add it to the set of transceivers.
 // Deprecated: Use AddTrack, AddTransceiverFromKind or AddTransceiverFromTrack
 func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
