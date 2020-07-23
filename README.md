@@ -13,7 +13,7 @@
   <a href="https://github.com/mudutv/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
   <a href="https://travis-ci.org/mudutv/webrtc"><img src="https://travis-ci.org/mudutv/webrtc.svg?branch=master" alt="Build Status"></a>
-  <a href="https://pkg.go.dev/github.com/mudutv/webrtc/v3"><img src="https://godoc.org/github.com/mudutv/webrtc?status.svg" alt="GoDoc"></a>
+  <a href="https://pkg.go.dev/github.com/mudutv/webrtc/v3"><img src="https://pkg.go.dev/badge/github.com/mudutv/webrtc/v3" alt="PkgGoDev"></a>
   <a href="https://codecov.io/gh/mudutv/webrtc"><img src="https://codecov.io/gh/mudutv/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
   <a href="https://goreportcard.com/report/github.com/mudutv/webrtc"><img src="https://goreportcard.com/badge/github.com/mudutv/webrtc" alt="Go Report Card"></a>
   <a href="https://www.codacy.com/app/Sean-Der/webrtc"><img src="https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d" alt="Codacy Badge"></a>
@@ -43,7 +43,7 @@ See [DESIGN.md](DESIGN.md) for the guiding principals/inspirations of the projec
 
 **[awesome-pion](https://github.com/mudutv/awesome-pion)** contains projects that have used Pion, and serve as real world examples of usage.
 
-**[GoDoc](https://godoc.org/github.com/mudutv/webrtc)** is an auto generated API reference. All our Public APIs are commented.
+**[GoDoc](https://pkg.go.dev/github.com/mudutv/webrtc/v3)** is an auto generated API reference. All our Public APIs are commented.
 
 **[FAQ](https://github.com/mudutv/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in [Slack](https://pion.ly/slack) we are always looking to expand it.
 
@@ -180,6 +180,9 @@ Check out the **[contributing wiki](https://github.com/mudutv/webrtc/wiki/Contri
 * [Nick Mykins](https://github.com/nmyk)
 * [Jason Brady](https://github.com/jbrady42)
 * [krishna chiatanya](https://github.com/kittuov)
+* [JacobZwang](https://github.com/JacobZwang)
+* [박종훈](https://github.com/JonghunBok)
+* [Sam Lancia](https://github.com/nerd2)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

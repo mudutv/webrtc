@@ -220,7 +220,3 @@ func (r *RTPSender) hasSent() bool {
 		return false
 	}
 }
-
-
-
-

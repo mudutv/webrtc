@@ -8,7 +8,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
-	mathRand "math/rand"
 	"regexp"
 	"strconv"
 	"strings"
@@ -594,8 +593,11 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 // 4.4.1.6 Set the SessionDescription
 func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
-	if pc.isClosed.get() {
+	switch {
+	case pc.isClosed.get():
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	case newSDPType(sd.Type.String()) == SDPType(Unknown):
+		return &rtcerr.TypeError{Err: fmt.Errorf("the provided value '%d' is not a valid enum value of type SDPType", sd.Type)}
 	}
 
 	nextState, err := func() (SignalingState, error) {
@@ -1224,40 +1226,6 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	return transceiver.Sender(), nil
 }
 
-// AddTrack adds a Track to the PeerConnection  miaobinwei
-func (pc *PeerConnection) AddTrackSetInit(track *Track,init ...RtpTransceiverInit) (*RTPSender, error) {
-	if pc.isClosed.get() {
-		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	}
-
-	var transceiver *RTPTransceiver
-	for _, t := range pc.GetTransceivers() {
-		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
-			transceiver = t
-			break
-		}
-	}
-	if transceiver != nil {
-		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
-		if err != nil {
-			return nil, err
-		}
-		transceiver.setSender(sender)
-		// we still need to call setSendingTrack to ensure direction has changed
-		if err := transceiver.setSendingTrack(track); err != nil {
-			return nil, err
-		}
-		return sender, nil
-	}
-
-	transceiver, err := pc.AddTransceiverFromTrack(track,init...)
-	if err != nil {
-		return nil, err
-	}
-
-	return transceiver.Sender(), nil
-}
-
 // AddTransceiver Create a new RTCRtpTransceiver and add it to the set of transceivers.
 // Deprecated: Use AddTrack, AddTransceiverFromKind or AddTransceiverFromTrack
 func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
@@ -1307,7 +1275,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 			return nil, fmt.Errorf("no %s codecs found", kind.String())
 		}
 
-		track, err := pc.NewTrack(codecs[0].PayloadType, mathRand.Uint32(), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultLabelLength))
+		track, err := pc.NewTrack(codecs[0].PayloadType, util.RandUint32(), util.MathRandAlpha(trackDefaultIDLength), util.MathRandAlpha(trackDefaultLabelLength))
 		if err != nil {
 			return nil, err
 		}
@@ -1769,7 +1737,10 @@ func (pc *PeerConnection) GetRegisteredRTPCodecs(kind RTPCodecType) []*RTPCodec 
 // generateUnmatchedSDP generates an SDP that doesn't take remote state into account
 // This is used for the initial call for CreateOffer
 func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDescription, error) {
-	d := sdp.NewJSEPSessionDescription(useIdentity)
+	d, err := sdp.NewJSEPSessionDescription(useIdentity)
+	if err != nil {
+		return nil, err
+	}
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -1828,7 +1799,10 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 // generateMatchedSDP generates a SDP and takes the remote state into account
 // this is used everytime we have a RemoteDescription
 func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
-	d := sdp.NewJSEPSessionDescription(useIdentity)
+	d, err := sdp.NewJSEPSessionDescription(useIdentity)
+	if err != nil {
+		return nil, err
+	}
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -1901,7 +1875,7 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 				t.Sender().setNegotiated()
 			}
 			mediaTransceivers := []*RTPTransceiver{t}
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, ridMap: getRids(media)})
 		}
 	}
 
@@ -1934,6 +1908,43 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 
 func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {
 	pc.iceGatherer.onGatheringCompleteHdlr.Store(hdlr)
+}
+
+
+
+
+//   miaobinwei
+func (pc *PeerConnection) AddTrackSetInit(track *Track,init ...RtpTransceiverInit) (*RTPSender, error) {
+	if pc.isClosed.get() {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	var transceiver *RTPTransceiver
+	for _, t := range pc.GetTransceivers() {
+		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
+			transceiver = t
+			break
+		}
+	}
+	if transceiver != nil {
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+		transceiver.setSender(sender)
+		// we still need to call setSendingTrack to ensure direction has changed
+		if err := transceiver.setSendingTrack(track); err != nil {
+			return nil, err
+		}
+		return sender, nil
+	}
+
+	transceiver, err := pc.AddTransceiverFromTrack(track,init...)
+	if err != nil {
+		return nil, err
+	}
+
+	return transceiver.Sender(), nil
 }
 
 //miaobinwei

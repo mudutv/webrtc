@@ -3,12 +3,13 @@
 package webrtc
 
 import (
-	"context"
 	"fmt"
-	"github.com/mudutv/rtp"
-	"github.com/mudutv/webrtc/v3/pkg/media"
 	"io"
 	"sync"
+
+	"github.com/mudutv/rtp"
+	"github.com/mudutv/webrtc/v3/pkg/media"
+	"context"
 )
 
 const (
@@ -112,6 +113,7 @@ func (t *Track) ReadContext(b []byte,ctx context.Context) (n int, err error) {
 	return r.readRTPContext(b,ctx)
 }
 
+
 // ReadRTP is a convenience method that wraps Read and unmarshals for you
 func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	b := make([]byte, receiveMTU)
@@ -141,6 +143,7 @@ func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
 	}
 	return r, nil
 }
+
 
 // Write writes data to the track. If this is a remote track this will error
 func (t *Track) Write(b []byte) (n int, err error) {
@@ -236,8 +239,3 @@ func (t *Track) determinePayloadType() error {
 
 	return nil
 }
-
-
-
-
-

@@ -4,12 +4,12 @@ package webrtc
 
 import (
 	"fmt"
+	"github.com/mudutv/sdp/v2"
 	"strconv"
 	"strings"
 
 	"github.com/mudutv/rtp"
 	"github.com/mudutv/rtp/codecs"
-	"github.com/mudutv/sdp/v2"
 )
 
 // PayloadTypes for the default codecs
@@ -166,13 +166,13 @@ func (m *MediaEngine) GetCodecsByKind(kind RTPCodecType) []*RTPCodec {
 
 // Names for the default codecs supported by Pion WebRTC
 const (
-	PCMU   = "PCMU"
-	PCMA   = "PCMA"
-	G722   = "G722"
-	Opus   = "opus"
-	VP8    = "VP8"
-	VP9    = "VP9"
-	H264   = "H264"
+	PCMU = "PCMU"
+	PCMA = "PCMA"
+	G722 = "G722"
+	Opus = "opus"
+	VP8  = "VP8"
+	VP9  = "VP9"
+	H264 = "H264"
 	RED    = "red"
 	ULPFEC = "ulpfec"
 	RTX    = "rtx"
@@ -288,7 +288,6 @@ func NewRTPH264Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 		&codecs.H264Payloader{})
 	return c
 }
-
 
 // NewRTPH264CodecExt is a helper to create an H264 codec
 func NewRTPH264CodecExt(payloadType uint8, clockrate uint32, rtcpfb []RTCPFeedback, fmtp string) *RTPCodec {
@@ -417,7 +416,6 @@ type RTPCapabilities struct {
 	Codecs           []RTPCodecCapability
 	HeaderExtensions []RTPHeaderExtensionCapability
 }
-
 
 //miaobinwei
 func NewRTPRedCodec(payloadType uint8, clockrate uint32) *RTPCodec {
