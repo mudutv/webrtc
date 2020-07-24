@@ -1455,6 +1455,30 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 	return nil
 }
 
+// WriteRTCP sends a user provided RTCP packet to the connected peer
+// If no peer is connected the packet is discarded
+func (pc *PeerConnection) WriteRTCPLen(pkts []rtcp.Packet) (int, error) {
+	raw, err := rtcp.Marshal(pkts)
+	if err != nil {
+		return 0,err
+	}
+
+	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+	if err != nil {
+		return 0,nil // TODO WriteRTCP before would gracefully discard packets until ready
+	}
+
+	writeStream, err := srtcpSession.OpenWriteStream()
+	if err != nil {
+		return 0,fmt.Errorf("WriteRTCP failed to open WriteStream: %v", err)
+	}
+
+	if n, err := writeStream.Write(raw); err != nil {
+		return n, err
+	}
+	return 0, nil
+}
+
 // Close ends the PeerConnection
 func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
@@ -1945,43 +1969,6 @@ func (pc *PeerConnection) AddTrackSetInit(track *Track,init ...RtpTransceiverIni
 	}
 
 	return transceiver.Sender(), nil
-}
-
-//miaobinwei
-func (pc *PeerConnection) GetTransceiverByKind(trackOrKind RTPCodecType) *RTPTransceiver {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-
-	for _,tr := range pc.rtpTransceivers{
-		if tr.kind == trackOrKind{
-			return tr
-		}
-	}
-	return nil
-}
-
-// WriteRTCP sends a user provided RTCP packet to the connected peer
-// If no peer is connected the packet is discarded
-func (pc *PeerConnection) WriteRTCPLen(pkts []rtcp.Packet) (int, error) {
-	raw, err := rtcp.Marshal(pkts)
-	if err != nil {
-		return 0,err
-	}
-
-	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
-	if err != nil {
-		return 0,nil // TODO WriteRTCP before would gracefully discard packets until ready
-	}
-
-	writeStream, err := srtcpSession.OpenWriteStream()
-	if err != nil {
-		return 0,fmt.Errorf("WriteRTCP failed to open WriteStream: %v", err)
-	}
-
-	if n, err := writeStream.Write(raw); err != nil {
-		return n, err
-	}
-	return 0, nil
 }
 
 

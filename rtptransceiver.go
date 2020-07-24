@@ -16,7 +16,6 @@ type RTPTransceiver struct {
 
 	stopped bool
 	kind    RTPCodecType
-	ExtMap  []string
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one
